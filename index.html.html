@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Çiftlik Veri Kaydı</title>
+    <style>
+        body { font-family: system-ui; max-width: 600px; margin: 2rem auto; padding: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        input { width: 100%; padding: 0.5rem; box-sizing: border-box; }
+        button { padding: 0.75rem 1.5rem; background: #007bff; color: white; border: none; cursor: pointer; margin-right: 0.5rem; }
+        button.export { background: #28a745; }
+        img.preview { max-width: 100px; max-height: 100px; margin-top: 10px; display: none; }
+        table { width: 100%; mt-2; border-collapse: collapse; margin-top: 2rem; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    </style>
+</head>
+<body>
+
+    <h2>Yeni Hayvan Ekle</h2>
+    <form id="animalForm">
+        <div class="form-group">
+            <label>Küpe Numarası</label>
+            <input type="text" id="kupeNo" required>
+        </div>
+        <div class="form-group">
+            <label>Anne Küpe Numarası</label>
+            <input type="text" id="anneKupeNo">
+        </div>
+        <div class="form-group">
+            <label>Hayvan Fotoğrafı</label>
+            <input type="file" id="foto" accept="image/*">
+            <img id="previewImg" class="preview">
+        </div>
+        <button type="submit">Kaydet</button>
+        <button type="button" class="export" onclick="exportToCSV()">Excel (CSV) İndir</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Küpe No</th>
+                <th>Anne Küpe No</th>
+                <th>Fotoğraf</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+    <script>
+        // Veritabanı Kurulumu (IndexedDB)
+        let db;
+        const request = indexedDB.open("CiftlikDB", 1);
+
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            db.createObjectStore("hayvanlar", { keyPath: "id", autoIncrement: true });
+        };
+
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            loadData(); // Sayfa açılınca verileri yükle
+        };
+
+        // Resim önizleme ve Base64 çevirme
+        let base64Image = "";
+        document.getElementById('foto').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                base64Image = reader.result;
+                const imgObj = document.getElementById('previewImg');
+                imgObj.src = base64Image;
+                imgObj.style.display = 'block';
+            };
+            if(file) reader.readAsDataURL(file);
+        });
+
+        // Form Gönderme ve Kayıt
+        document.getElementById('animalForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newData = {
+                kupeNo: document.getElementById('kupeNo').value,
+                anneKupeNo: document.getElementById('anneKupeNo').value,
+                foto: base64Image
+            };
+
+            const tx = db.transaction("hayvanlar", "readwrite");
+            tx.objectStore("hayvanlar").add(newData);
+            tx.oncomplete = () => {
+                document.getElementById('animalForm').reset();
+                document.getElementById('previewImg').style.display = 'none';
+                base64Image = "";
+                loadData();
+            };
+        });
+
+        // Verileri Tabloya Çizme
+        function loadData() {
+            const tx = db.transaction("hayvanlar", "readonly");
+            const store = tx.objectStore("hayvanlar");
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const tbody = document.getElementById('tableBody');
+                tbody.innerHTML = "";
+                request.result.forEach(row => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${row.kupeNo}</td>
+                            <td>${row.anneKupeNo}</td>
+                            <td>${row.foto ? '<img src="'+row.foto+'" style="max-width:50px;">' : 'Yok'}</td>
+                        </tr>
+                    `;
+                });
+            };
+        }
+
+        // CSV (Excel) Dışa Aktarma
+        function exportToCSV() {
+            const tx = db.transaction("hayvanlar", "readonly");
+            const request = tx.objectStore("hayvanlar").getAll();
+
+            request.onsuccess = () => {
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Kupe No,Anne Kupe No\n"; // Başlıklar (Resimleri CSV'ye koyamayız)
+                
+                request.result.forEach(row => {
+                    csvContent += `${row.kupeNo},${row.anneKupeNo}\n`;
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "ciftlik_verileri.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+        }
+    </script>
+</body>
+</html>
