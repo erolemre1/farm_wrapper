@@ -1,107 +1,194 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Çiftlik Veri Kaydı</title>
+    <title>Çiftlik Veri Yönetimi</title>
+    <!-- Excel işlemleri için kütüphane -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: system-ui; max-width: 600px; margin: 2rem auto; padding: 1rem; }
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 1rem; background: #f4f4f9; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
         .form-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
-        input { width: 100%; padding: 0.5rem; box-sizing: border-box; }
-        button { padding: 0.75rem 1.5rem; background: #007bff; color: white; border: none; cursor: pointer; margin-right: 0.5rem; }
-        button.export { background: #28a745; }
-        img.preview { max-width: 100px; max-height: 100px; margin-top: 10px; display: none; }
-        table { width: 100%; mt-2; border-collapse: collapse; margin-top: 2rem; }
+        label { display: block; margin-bottom: 0.3rem; font-weight: 600; font-size: 0.9rem; }
+        input, select { width: 100%; padding: 0.6rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 0.6rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; margin-top: 0.5rem; }
+        .btn-primary { background: #0056b3; width: 100%; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+        .btn-info { background: #17a2b8; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+        .preview { max-width: 80px; max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: white; font-size: 0.9rem; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f8f9fa; }
+        .action-buttons { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
     </style>
 </head>
 <body>
 
-    <h2>Yeni Hayvan Ekle</h2>
-    <form id="animalForm">
-        <div class="form-group">
-            <label>Küpe Numarası</label>
-            <input type="text" id="kupeNo" required>
-        </div>
-        <div class="form-group">
-            <label>Anne Küpe Numarası</label>
-            <input type="text" id="anneKupeNo">
-        </div>
-        <div class="form-group">
-            <label>Hayvan Fotoğrafı</label>
-            <input type="file" id="foto" accept="image/*">
-            <img id="previewImg" class="preview">
-        </div>
-        <button type="submit">Kaydet</button>
-        <button type="button" class="export" onclick="exportToCSV()">Excel (CSV) İndir</button>
-    </form>
+    <div class="card">
+        <h2 id="formTitle">Yeni Hayvan Ekle</h2>
+        <form id="animalForm">
+            <input type="hidden" id="editId">
+            <div class="grid">
+                <div class="form-group">
+                    <label>Küpe Numarası</label>
+                    <input type="text" id="kupeNo" required>
+                </div>
+                <div class="form-group">
+                    <label>Cinsiyeti</label>
+                    <select id="cinsiyet" required>
+                        <option value="">Seçiniz...</option>
+                        <option value="Erkek">Erkek</option>
+                        <option value="Dişi">Dişi</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Hayvanın Cinsi (Irkı)</label>
+                    <input type="text" id="hayvanCinsi" required>
+                </div>
+                <div class="form-group">
+                    <label>Doğum Tarihi</label>
+                    <input type="date" id="dogumTarihi" required>
+                </div>
+                <div class="form-group">
+                    <label>Anne Küpe Numarası</label>
+                    <input type="text" id="anneKupeNo">
+                </div>
+                <div class="form-group">
+                    <label>Annesinin Cinsi (Irkı)</label>
+                    <input type="text" id="anneCinsi">
+                </div>
+                <div class="form-group">
+                    <label>Koğuştuğu Tarih</label>
+                    <input type="date" id="kogustuguTarih" required>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="form-group">
+                    <label>Hayvanın Resmi</label>
+                    <input type="file" id="hayvanResmi" accept="image/*">
+                    <img id="previewHayvan" class="preview">
+                </div>
+                <div class="form-group">
+                    <label>Anne Resmi</label>
+                    <input type="file" id="anneResmi" accept="image/*">
+                    <img id="previewAnne" class="preview">
+                </div>
+            </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Küpe No</th>
-                <th>Anne Küpe No</th>
-                <th>Fotoğraf</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-    </table>
+            <button type="submit" class="btn-primary" id="submitBtn">Kaydet</button>
+            <button type="button" class="btn-warning" id="cancelEditBtn" style="display:none; width: 100%; margin-top:5px;" onclick="cancelEdit()">İptal Et</button>
+        </form>
+    </div>
+
+    <div class="action-buttons">
+        <button class="btn-success" onclick="exportExcel()">📊 Excel Olarak İndir</button>
+        <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
+        <div>
+            <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px;">
+                📂 Yedek Yükle (PC-Telefon Aktarımı)
+                <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJSON(event)">
+            </label>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Küpe No</th>
+                    <th>Cinsiyet</th>
+                    <th>Irk</th>
+                    <th>Doğum Tarihi</th>
+                    <th>Koğuştuğu Tarih</th>
+                    <th>Anne Küpe No</th>
+                    <th>Resimler</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
 
     <script>
-        // Veritabanı Kurulumu (IndexedDB)
         let db;
-        const request = indexedDB.open("CiftlikDB", 1);
+        let base64Hayvan = "";
+        let base64Anne = "";
 
+        // 1. Veritabanı Kurulumu
+        const request = indexedDB.open("CiftlikPro", 1);
         request.onupgradeneeded = (e) => {
             db = e.target.result;
-            db.createObjectStore("hayvanlar", { keyPath: "id", autoIncrement: true });
+            if (!db.objectStoreNames.contains("kayitlar")) {
+                db.createObjectStore("kayitlar", { keyPath: "id", autoIncrement: true });
+            }
         };
-
         request.onsuccess = (e) => {
             db = e.target.result;
-            loadData(); // Sayfa açılınca verileri yükle
+            loadData();
         };
 
-        // Resim önizleme ve Base64 çevirme
-        let base64Image = "";
-        document.getElementById('foto').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                base64Image = reader.result;
-                const imgObj = document.getElementById('previewImg');
-                imgObj.src = base64Image;
-                imgObj.style.display = 'block';
-            };
-            if(file) reader.readAsDataURL(file);
-        });
+        // 2. Fotoğraf İşlemleri (Base64'e Çevirme)
+        function handleImageUpload(inputId, previewId, isAnne) {
+            document.getElementById(inputId).addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (isAnne) base64Anne = reader.result;
+                    else base64Hayvan = reader.result;
+                    
+                    const imgObj = document.getElementById(previewId);
+                    imgObj.src = reader.result;
+                    imgObj.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        handleImageUpload('hayvanResmi', 'previewHayvan', false);
+        handleImageUpload('anneResmi', 'previewAnne', true);
 
-        // Form Gönderme ve Kayıt
+        // 3. Form Kaydetme ve Düzenleme (Update) İşlemi
         document.getElementById('animalForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            const newData = {
+            
+            const data = {
                 kupeNo: document.getElementById('kupeNo').value,
+                cinsiyet: document.getElementById('cinsiyet').value,
+                hayvanCinsi: document.getElementById('hayvanCinsi').value,
+                dogumTarihi: document.getElementById('dogumTarihi').value,
                 anneKupeNo: document.getElementById('anneKupeNo').value,
-                foto: base64Image
+                anneCinsi: document.getElementById('anneCinsi').value,
+                kogustuguTarih: document.getElementById('kogustuguTarih').value,
+                hayvanResmi: base64Hayvan,
+                anneResmi: base64Anne
             };
 
-            const tx = db.transaction("hayvanlar", "readwrite");
-            tx.objectStore("hayvanlar").add(newData);
+            const editId = document.getElementById('editId').value;
+            if (editId) data.id = Number(editId); // Eğer düzenleme modundaysa ID'yi koru
+
+            const tx = db.transaction("kayitlar", "readwrite");
+            const store = tx.objectStore("kayitlar");
+            
+            if (editId) store.put(data); // Güncelle
+            else store.add(data); // Yeni ekle
+
             tx.oncomplete = () => {
-                document.getElementById('animalForm').reset();
-                document.getElementById('previewImg').style.display = 'none';
-                base64Image = "";
+                cancelEdit(); // Formu sıfırla
                 loadData();
             };
         });
 
-        // Verileri Tabloya Çizme
+        // 4. Verileri Tabloya Yükleme
         function loadData() {
-            const tx = db.transaction("hayvanlar", "readonly");
-            const store = tx.objectStore("hayvanlar");
-            const request = store.getAll();
+            const tx = db.transaction("kayitlar", "readonly");
+            const request = tx.objectStore("kayitlar").getAll();
 
             request.onsuccess = () => {
                 const tbody = document.getElementById('tableBody');
@@ -109,37 +196,144 @@
                 request.result.forEach(row => {
                     tbody.innerHTML += `
                         <tr>
-                            <td>${row.kupeNo}</td>
-                            <td>${row.anneKupeNo}</td>
-                            <td>${row.foto ? '<img src="'+row.foto+'" style="max-width:50px;">' : 'Yok'}</td>
+                            <td><strong>${row.kupeNo}</strong></td>
+                            <td>${row.cinsiyet}</td>
+                            <td>${row.hayvanCinsi}</td>
+                            <td>${row.dogumTarihi}</td>
+                            <td>${row.kogustuguTarih}</td>
+                            <td>${row.anneKupeNo || '-'}</td>
+                            <td>
+                                ${row.hayvanResmi ? '<img src="'+row.hayvanResmi+'" style="width:40px; height:40px; border-radius:4px;">' : 'Yok'}
+                                ${row.anneResmi ? '<img src="'+row.anneResmi+'" style="width:40px; height:40px; border-radius:4px; margin-left:5px;">' : ''}
+                            </td>
+                            <td>
+                                <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>Düzenle</button>
+                                <button class="btn-danger" onclick="deleteData(${row.id})">Sil</button>
+                            </td>
                         </tr>
                     `;
                 });
             };
         }
 
-        // CSV (Excel) Dışa Aktarma
-        function exportToCSV() {
-            const tx = db.transaction("hayvanlar", "readonly");
-            const request = tx.objectStore("hayvanlar").getAll();
+        // 5. Düzenleme (Edit) Modunu Başlatma
+        window.startEdit = function(row) {
+            document.getElementById('formTitle').innerText = "Kayıt Düzenle";
+            document.getElementById('submitBtn').innerText = "Güncelle";
+            document.getElementById('cancelEditBtn').style.display = "block";
+            
+            document.getElementById('editId').value = row.id;
+            document.getElementById('kupeNo').value = row.kupeNo;
+            document.getElementById('cinsiyet').value = row.cinsiyet;
+            document.getElementById('hayvanCinsi').value = row.hayvanCinsi;
+            document.getElementById('dogumTarihi').value = row.dogumTarihi;
+            document.getElementById('anneKupeNo').value = row.anneKupeNo;
+            document.getElementById('anneCinsi').value = row.anneCinsi;
+            document.getElementById('kogustuguTarih').value = row.kogustuguTarih;
+
+            base64Hayvan = row.hayvanResmi || "";
+            base64Anne = row.anneResmi || "";
+
+            const prevHayvan = document.getElementById('previewHayvan');
+            const prevAnne = document.getElementById('previewAnne');
+
+            if(base64Hayvan) { prevHayvan.src = base64Hayvan; prevHayvan.style.display = 'block'; } else { prevHayvan.style.display = 'none'; }
+            if(base64Anne) { prevAnne.src = base64Anne; prevAnne.style.display = 'block'; } else { prevAnne.style.display = 'none'; }
+            
+            window.scrollTo(0, 0); // Sayfanın en üstüne formun olduğu yere çık
+        };
+
+        // Düzenleme Modundan Çıkma
+        window.cancelEdit = function() {
+            document.getElementById('animalForm').reset();
+            document.getElementById('editId').value = "";
+            document.getElementById('formTitle').innerText = "Yeni Hayvan Ekle";
+            document.getElementById('submitBtn').innerText = "Kaydet";
+            document.getElementById('cancelEditBtn').style.display = "none";
+            document.getElementById('previewHayvan').style.display = 'none';
+            document.getElementById('previewAnne').style.display = 'none';
+            base64Hayvan = "";
+            base64Anne = "";
+        };
+
+        // Veri Silme
+        window.deleteData = function(id) {
+            if(confirm("Bu kaydı silmek istediğinize emin misiniz?")) {
+                const tx = db.transaction("kayitlar", "readwrite");
+                tx.objectStore("kayitlar").delete(id);
+                tx.oncomplete = () => loadData();
+            }
+        };
+
+        // 6. Tarihli Excel Export (Sadece Raporlama)
+        window.exportExcel = function() {
+            const tx = db.transaction("kayitlar", "readonly");
+            const request = tx.objectStore("kayitlar").getAll();
 
             request.onsuccess = () => {
-                let csvContent = "data:text/csv;charset=utf-8,";
-                csvContent += "Kupe No,Anne Kupe No\n"; // Başlıklar (Resimleri CSV'ye koyamayız)
-                
-                request.result.forEach(row => {
-                    csvContent += `${row.kupeNo},${row.anneKupeNo}\n`;
-                });
+                const data = request.result.map(row => ({
+                    "Küpe Numarası": row.kupeNo,
+                    "Cinsiyeti": row.cinsiyet,
+                    "Hayvanın Cinsi": row.hayvanCinsi,
+                    "Doğum Tarihi": row.dogumTarihi,
+                    "Koğuştuğu Tarih": row.kogustuguTarih,
+                    "Anne Küpe Numarası": row.anneKupeNo,
+                    "Annesinin Cinsi": row.anneCinsi
+                }));
 
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "ciftlik_verileri.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                const worksheet = XLSX.utils.json_to_sheet(data);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Hayvanlar");
+
+                // Tarihi alıp dosya ismine ekleme (Örn: 2026-07-28)
+                const today = new Date().toISOString().split('T')[0];
+                XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}.xlsx`);
             };
-        }
+        };
+
+        // 7. JSON Export (Fotoğraflı Tam Yedek)
+        window.exportJSON = function() {
+            const tx = db.transaction("kayitlar", "readonly");
+            const request = tx.objectStore("kayitlar").getAll();
+
+            request.onsuccess = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(request.result));
+                const today = new Date().toISOString().split('T')[0];
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            };
+        };
+
+        // 8. JSON Import (Yedekten Geri Yükleme - Cihazlar Arası Senkronizasyon)
+        window.importJSON = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    const tx = db.transaction("kayitlar", "readwrite");
+                    const store = tx.objectStore("kayitlar");
+                    
+                    data.forEach(item => {
+                        store.put(item); // Varsa günceller, yoksa ekler (ID'ye göre)
+                    });
+
+                    tx.oncomplete = () => {
+                        alert("Yedek başarıyla yüklendi!");
+                        loadData();
+                    };
+                } catch (err) {
+                    alert("Geçersiz yedek dosyası!");
+                }
+            };
+            reader.readAsText(file);
+        };
     </script>
 </body>
 </html>
