@@ -398,16 +398,18 @@
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Hayvanlar");
             const today = new Date().toISOString().split('T')[0];
-            XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}.xlsx`);
+            const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
+            XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}_${todayTime}.xlsx`);
         };
 
         // JSON Export
         window.exportJSON = function() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
             const today = new Date().toISOString().split('T')[0];
+            const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
             const downloadAnchorNode = document.createElement('a');
             downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}.json`);
+            downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}_${todayTime}.json`);
             document.body.appendChild(downloadAnchorNode);
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
