@@ -456,18 +456,37 @@
         };
 
         // JSON Import
+// JSON Import (Tamamen Üzerine Yazma Mantığıyla)
         window.importJSON = function(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            // Yanlışlıkla veri kaybını önlemek için onay istiyoruz
+            if(!confirm("DİKKAT: Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK ve sadece yedekteki veriler yüklenecektir. Onaylıyor musunuz?")) {
+                event.target.value = ''; // İptal edilirse dosya seçimini sıfırla
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
                     const tx = db.transaction("kayitlar", "readwrite");
                     const store = tx.objectStore("kayitlar");
+                    
+                    // 1. ADIM: Mevcut veritabanını tamamen temizle
+                    store.clear();
+
+                    // 2. ADIM: Yedek dosyasındaki verileri tertemiz veritabanına yaz
                     data.forEach(item => store.put(item));
-                    tx.oncomplete = () => { alert("Yedek yüklendi!"); loadData(); };
-                } catch (err) { alert("Geçersiz yedek dosyası!"); }
+                    
+                    tx.oncomplete = () => { 
+                        alert("Yedek başarıyla yüklendi ve eski veriler temizlendi!"); 
+                        loadData(); 
+                    };
+                } catch (err) { 
+                    alert("Geçersiz yedek dosyası!"); 
+                }
             };
             reader.readAsText(file);
         };
