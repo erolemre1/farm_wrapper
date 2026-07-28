@@ -9,10 +9,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Çiftlik Veri">
-
     <!-- Kendi indirdiğin ikonu buraya bağlıyorsun -->
     <link rel="apple-touch-icon" href="./cow.png">
     <link rel="icon" type="image/png" href="./cow.png">
+
     <!-- Excel işlemleri için kütüphane -->
     <!-- <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script> -->
     <style>
@@ -176,7 +176,7 @@
         <div id="pagination" class="pagination"></div>
     </div>
 
-    <!-- Resim Büyütme Modalı -->
+    <!-- Resim Büyütme Modalı (Gizli Katman) -->
     <div id="imageModal" class="modal" onclick="closeModal()">
         <span class="close-modal">&times;</span>
         <img class="modal-content" id="expandedImg">
@@ -312,7 +312,7 @@
             const pageData = filteredData.slice(startIndex, endIndex);
 
             pageData.forEach(row => {
-                // onclick="openModal(this.src)" eklenerek resimler tıklanabilir hale getirildi
+                // onclick="openModal(this.src)" kodu sayesinde resimler tıklanabilir hale gelir ve büyütme fonksiyonunu tetikler
                 const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
                 const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
 
@@ -409,7 +409,7 @@
             }
         };
 
-        // Resim Büyütme Fonksiyonları
+        // Resim Büyütme (Modal) Fonksiyonları
         window.openModal = function(src) {
             const modal = document.getElementById("imageModal");
             const modalImg = document.getElementById("expandedImg");
