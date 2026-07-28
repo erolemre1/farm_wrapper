@@ -96,7 +96,7 @@
                 </div>
                 <div class="form-group">
                     <label>Koğuştuğu Tarih</label>
-                    <input type="date" id="kogustuguTarih" required>
+                    <input type="date" id="kogustuguTarih">
                 </div>
             </div>
             
@@ -272,6 +272,17 @@
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
             
+            if (filteredData.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11" style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
+                    Aradığınız kriterlere uygun kayıt bulunamadı.
+                </td>
+            </tr>
+        `;
+        return; // İşlemi burada kesip alt kısımdaki çizim kodlarını çalıştırmıyoruz
+    }
+    
             // Sayfalama hesaplamaları
             const startIndex = (currentPage - 1) * rowsPerPage;
             const endIndex = startIndex + rowsPerPage;
