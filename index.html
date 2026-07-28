@@ -26,6 +26,7 @@
         
         .search-box { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; box-sizing: border-box; }
         .action-buttons { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+        .total-count { background: #0056b3; color: white; padding: 0.5rem 1rem; border-radius: 4px; font-weight: bold; display: inline-block; margin-bottom: 1rem; }
         
         .table-responsive { overflow-x: auto; background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; }
@@ -50,6 +51,10 @@
                     <input type="text" id="kupeNo" inputmode="numeric" pattern="[0-9]*" required>
                 </div>
                 <div class="form-group">
+                    <label>Hayvan Lakabı</label>
+                    <input type="text" id="hayvanLakabi">
+                </div>
+                <div class="form-group">
                     <label>Cinsiyeti</label>
                     <select id="cinsiyet" required>
                         <option value="">Seçiniz...</option>
@@ -57,18 +62,18 @@
                         <option value="Dişi">Dişi</option>
                     </select>
                 </div>
-<div class="form-group">
-    <label>Hayvanın Cinsi (Irkı)</label>
-    <select id="hayvanCinsi" required>
-        <option value="">Seçiniz...</option>
-            <option value="simental">Simental </option>
-            <option value="hollanda">Hollanda </option>
-            <option value="simental-kırma">Simental Kırma </option>
-            <option value="hollanda-kırma">Hollanda Kırma </option>
-            <option value="montofon">Montofon</option>
-            <option value="boz">Boz</option>
-    </select>
-</div>
+                <div class="form-group">
+                    <label>Hayvanın Cinsi (Irkı)</label>
+                    <select id="hayvanCinsi" required>
+                        <option value="">Seçiniz...</option>
+                            <option value="simental">Simental </option>
+                            <option value="hollanda">Hollanda </option>
+                            <option value="simental-kırma">Simental Kırma </option>
+                            <option value="hollanda-kırma">Hollanda Kırma </option>
+                            <option value="montofon">Montofon</option>
+                            <option value="boz">Boz</option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <label>Doğum Tarihi</label>
                     <input type="date" id="dogumTarihi" required>
@@ -77,18 +82,18 @@
                     <label>Anne Küpe Numarası</label>
                     <input type="text" id="anneKupeNo" inputmode="numeric" pattern="[0-9]*">
                 </div>
-<div class="form-group">
-    <label>Annesinin Cinsi (Irkı)</label>
-    <select id="anneCinsi">
-        <option value="">Seçiniz (Zorunlu Değil)</option>
-            <option value="simental">Simental </option>
-            <option value="hollanda">Hollanda </option>
-            <option value="simental-kırma">Simental Kırma </option>
-            <option value="hollanda-kırma">Hollanda Kırma </option>
-            <option value="montofon">Montofon</option>
-            <option value="boz">Boz</option>
-    </select>
-</div>
+                <div class="form-group">
+                    <label>Annesinin Cinsi (Irkı)</label>
+                    <select id="anneCinsi">
+                        <option value="">Seçiniz (Zorunlu Değil)</option>
+                            <option value="simental">Simental </option>
+                            <option value="hollanda">Hollanda </option>
+                            <option value="simental-kırma">Simental Kırma </option>
+                            <option value="hollanda-kırma">Hollanda Kırma </option>
+                            <option value="montofon">Montofon</option>
+                            <option value="boz">Boz</option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <label>Koğuştuğu Tarih</label>
                     <input type="date" id="kogustuguTarih" required>
@@ -125,6 +130,9 @@
     </div>
 
     <div class="table-responsive">
+        <!-- Toplam Sayı -->
+        <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
+        
         <!-- Arama Kutusu -->
         <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
         
@@ -133,6 +141,7 @@
                 <tr>
                     <th>Sırası</th>
                     <th>Küpe No</th>
+                    <th>Lakap</th>
                     <th>Cinsiyet</th>
                     <th>Irk</th>
                     <th>Doğum Tarihi</th>
@@ -200,6 +209,7 @@
             
             const data = {
                 kupeNo: document.getElementById('kupeNo').value,
+                hayvanLakabi: document.getElementById('hayvanLakabi').value,
                 cinsiyet: document.getElementById('cinsiyet').value,
                 hayvanCinsi: document.getElementById('hayvanCinsi').value,
                 dogumTarihi: document.getElementById('dogumTarihi').value,
@@ -231,7 +241,12 @@
             const request = tx.objectStore("kayitlar").getAll();
 
             request.onsuccess = () => {
-                allData = request.result.reverse(); // Son eklenen en üstte görünsün
+                // ID'ye göre küçükten büyüğe sıralama
+                allData = request.result.sort((a, b) => a.id - b.id); 
+                
+                // Toplam hayvan sayısını güncelleme
+                document.getElementById('totalCount').innerText = "Toplam Hayvan Sayısı: " + allData.length;
+                
                 applyFilter();
             };
         }
@@ -243,7 +258,8 @@
             filteredData = allData.filter(row => {
                 const kupe = (row.kupeNo || "").toLowerCase();
                 const cins = (row.hayvanCinsi || "").toLowerCase();
-                return kupe.includes(searchTerm) || cins.includes(searchTerm);
+                const lakap = (row.hayvanLakabi || "").toLowerCase();
+                return kupe.includes(searchTerm) || cins.includes(searchTerm) || lakap.includes(searchTerm);
             });
             
             currentPage = 1; // Arama yapıldığında her zaman 1. sayfaya dön
@@ -266,6 +282,7 @@
                     <tr>
                         <td><strong>${row.id}</strong></td>
                         <td>${row.kupeNo}</td>
+                        <td>${row.hayvanLakabi || '-'}</td>
                         <td>${row.cinsiyet}</td>
                         <td>${row.hayvanCinsi}</td>
                         <td>${row.dogumTarihi}</td>
@@ -312,6 +329,7 @@
             
             document.getElementById('editId').value = row.id;
             document.getElementById('kupeNo').value = row.kupeNo;
+            document.getElementById('hayvanLakabi').value = row.hayvanLakabi || "";
             document.getElementById('cinsiyet').value = row.cinsiyet;
             document.getElementById('hayvanCinsi').value = row.hayvanCinsi;
             document.getElementById('dogumTarihi').value = row.dogumTarihi;
@@ -357,6 +375,7 @@
         window.exportExcel = function() {
             const data = allData.map(row => ({
                 "Küpe Numarası": row.kupeNo,
+                "Hayvan Lakabı": row.hayvanLakabi || "-",
                 "Cinsiyeti": row.cinsiyet,
                 "Hayvanın Cinsi": row.hayvanCinsi,
                 "Doğum Tarihi": row.dogumTarihi,
