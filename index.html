@@ -47,7 +47,7 @@
             <div class="grid">
                 <div class="form-group">
                     <label>Küpe Numarası</label>
-                    <input type="text" id="kupeNo" required>
+                    <input type="text" id="kupeNo" inputmode="numeric" pattern="[0-9]*" required>
                 </div>
                 <div class="form-group">
                     <label>Cinsiyeti</label>
@@ -57,22 +57,38 @@
                         <option value="Dişi">Dişi</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Hayvanın Cinsi (Irkı)</label>
-                    <input type="text" id="hayvanCinsi" required>
-                </div>
+<div class="form-group">
+    <label>Hayvanın Cinsi (Irkı)</label>
+    <select id="hayvanCinsi" required>
+        <option value="">Seçiniz...</option>
+            <option value="simental">Simental </option>
+            <option value="hollanda">Hollanda </option>
+            <option value="simental-kırma">Simental Kırma </option>
+            <option value="hollanda-kırma">Hollanda Kırma </option>
+            <option value="montofon">Montofon</option>
+            <option value="boz">Boz</option>
+    </select>
+</div>
                 <div class="form-group">
                     <label>Doğum Tarihi</label>
                     <input type="date" id="dogumTarihi" required>
                 </div>
                 <div class="form-group">
                     <label>Anne Küpe Numarası</label>
-                    <input type="text" id="anneKupeNo">
+                    <input type="text" id="anneKupeNo" inputmode="numeric" pattern="[0-9]*">
                 </div>
-                <div class="form-group">
-                    <label>Annesinin Cinsi (Irkı)</label>
-                    <input type="text" id="anneCinsi">
-                </div>
+<div class="form-group">
+    <label>Annesinin Cinsi (Irkı)</label>
+    <select id="anneCinsi">
+        <option value="">Seçiniz (Zorunlu Değil)</option>
+            <option value="simental">Simental </option>
+            <option value="hollanda">Hollanda </option>
+            <option value="simental-kırma">Simental Kırma </option>
+            <option value="hollanda-kırma">Hollanda Kırma </option>
+            <option value="montofon">Montofon</option>
+            <option value="boz">Boz</option>
+    </select>
+</div>
                 <div class="form-group">
                     <label>Koğuştuğu Tarih</label>
                     <input type="date" id="kogustuguTarih" required>
@@ -98,7 +114,7 @@
     </div>
 
     <div class="action-buttons">
-        <button class="btn-success" onclick="exportExcel()">📊 Excel Olarak İndir</button>
+        <!-- <button class="btn-success" onclick="exportExcel()">📊 Excel Olarak İndir</button> -->
         <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
         <div>
             <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
@@ -115,6 +131,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>Sırası</th>
                     <th>Küpe No</th>
                     <th>Cinsiyet</th>
                     <th>Irk</th>
@@ -247,7 +264,8 @@
             pageData.forEach(row => {
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${row.kupeNo}</strong></td>
+                        <td><strong>${row.id}</strong></td>
+                        <td>${row.kupeNo}</td>
                         <td>${row.cinsiyet}</td>
                         <td>${row.hayvanCinsi}</td>
                         <td>${row.dogumTarihi}</td>
