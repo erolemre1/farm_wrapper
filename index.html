@@ -7,7 +7,7 @@
     <!-- Excel işlemleri için kütüphane -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 1rem; background: #f4f4f9; }
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; background: #f4f4f9; }
         .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
@@ -20,12 +20,22 @@
         .btn-warning { background: #ffc107; color: black; }
         .btn-danger { background: #dc3545; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
         .btn-info { background: #17a2b8; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+        
         .preview { max-width: 80px; max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
-        .table-responsive { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: white; font-size: 0.9rem; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #f8f9fa; }
+        .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
+        
+        .search-box { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; box-sizing: border-box; }
         .action-buttons { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+        
+        .table-responsive { overflow-x: auto; background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle; }
+        th { background: #f8f9fa; }
+        
+        /* Sayfalama (Pagination) Stilleri */
+        .pagination { display: flex; gap: 5px; justify-content: center; margin-top: 15px; }
+        .page-btn { padding: 5px 12px; background: #e9ecef; color: black; border-radius: 4px; margin: 0; }
+        .page-btn.active { background: #0056b3; color: white; }
     </style>
 </head>
 <body>
@@ -91,7 +101,7 @@
         <button class="btn-success" onclick="exportExcel()">📊 Excel Olarak İndir</button>
         <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
         <div>
-            <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px;">
+            <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
                 📂 Yedek Yükle (PC-Telefon Aktarımı)
                 <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJSON(event)">
             </label>
@@ -99,6 +109,9 @@
     </div>
 
     <div class="table-responsive">
+        <!-- Arama Kutusu -->
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
+        
         <table>
             <thead>
                 <tr>
@@ -108,18 +121,28 @@
                     <th>Doğum Tarihi</th>
                     <th>Koğuştuğu Tarih</th>
                     <th>Anne Küpe No</th>
-                    <th>Resimler</th>
+                    <th>Hayvan Resmi</th>
+                    <th>Anne Resmi</th>
                     <th>İşlemler</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
+        
+        <!-- Sayfalama (Pagination) Alanı -->
+        <div id="pagination" class="pagination"></div>
     </div>
 
     <script>
         let db;
         let base64Hayvan = "";
         let base64Anne = "";
+        
+        // Tablo State Yönetimi
+        let allData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        const rowsPerPage = 5; // Sayfa başına gösterilecek kayıt sayısı
 
         // 1. Veritabanı Kurulumu
         const request = indexedDB.open("CiftlikPro", 1);
@@ -134,7 +157,7 @@
             loadData();
         };
 
-        // 2. Fotoğraf İşlemleri (Base64'e Çevirme)
+        // 2. Fotoğraf İşlemleri
         function handleImageUpload(inputId, previewId, isAnne) {
             document.getElementById(inputId).addEventListener('change', function(e) {
                 const file = e.target.files[0];
@@ -154,7 +177,7 @@
         handleImageUpload('hayvanResmi', 'previewHayvan', false);
         handleImageUpload('anneResmi', 'previewAnne', true);
 
-        // 3. Form Kaydetme ve Düzenleme (Update) İşlemi
+        // 3. Form Kaydetme
         document.getElementById('animalForm').addEventListener('submit', (e) => {
             e.preventDefault();
             
@@ -171,52 +194,99 @@
             };
 
             const editId = document.getElementById('editId').value;
-            if (editId) data.id = Number(editId); // Eğer düzenleme modundaysa ID'yi koru
+            if (editId) data.id = Number(editId); 
 
             const tx = db.transaction("kayitlar", "readwrite");
             const store = tx.objectStore("kayitlar");
             
-            if (editId) store.put(data); // Güncelle
-            else store.add(data); // Yeni ekle
+            if (editId) store.put(data); 
+            else store.add(data); 
 
             tx.oncomplete = () => {
-                cancelEdit(); // Formu sıfırla
+                cancelEdit(); 
                 loadData();
             };
         });
 
-        // 4. Verileri Tabloya Yükleme
+        // 4. Verileri Çekme ve Filtreleme
         function loadData() {
             const tx = db.transaction("kayitlar", "readonly");
             const request = tx.objectStore("kayitlar").getAll();
 
             request.onsuccess = () => {
-                const tbody = document.getElementById('tableBody');
-                tbody.innerHTML = "";
-                request.result.forEach(row => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${row.kupeNo}</strong></td>
-                            <td>${row.cinsiyet}</td>
-                            <td>${row.hayvanCinsi}</td>
-                            <td>${row.dogumTarihi}</td>
-                            <td>${row.kogustuguTarih}</td>
-                            <td>${row.anneKupeNo || '-'}</td>
-                            <td>
-                                ${row.hayvanResmi ? '<img src="'+row.hayvanResmi+'" style="width:40px; height:40px; border-radius:4px;">' : 'Yok'}
-                                ${row.anneResmi ? '<img src="'+row.anneResmi+'" style="width:40px; height:40px; border-radius:4px; margin-left:5px;">' : ''}
-                            </td>
-                            <td>
-                                <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>Düzenle</button>
-                                <button class="btn-danger" onclick="deleteData(${row.id})">Sil</button>
-                            </td>
-                        </tr>
-                    `;
-                });
+                allData = request.result.reverse(); // Son eklenen en üstte görünsün
+                applyFilter();
             };
         }
 
-        // 5. Düzenleme (Edit) Modunu Başlatma
+        // Arama (Filtreleme) Fonksiyonu
+        window.applyFilter = function() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            filteredData = allData.filter(row => {
+                const kupe = (row.kupeNo || "").toLowerCase();
+                const cins = (row.hayvanCinsi || "").toLowerCase();
+                return kupe.includes(searchTerm) || cins.includes(searchTerm);
+            });
+            
+            currentPage = 1; // Arama yapıldığında her zaman 1. sayfaya dön
+            renderTable();
+            renderPagination();
+        };
+
+        // 5. Tabloyu Çizme (Sayfalamalı)
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = "";
+            
+            // Sayfalama hesaplamaları
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = startIndex + rowsPerPage;
+            const pageData = filteredData.slice(startIndex, endIndex);
+
+            pageData.forEach(row => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${row.kupeNo}</strong></td>
+                        <td>${row.cinsiyet}</td>
+                        <td>${row.hayvanCinsi}</td>
+                        <td>${row.dogumTarihi}</td>
+                        <td>${row.kogustuguTarih}</td>
+                        <td>${row.anneKupeNo || '-'}</td>
+                        <td>${row.hayvanResmi ? '<img src="'+row.hayvanResmi+'" class="table-img">' : '<span style="color:#999; font-size:0.8rem;">Yok</span>'}</td>
+                        <td>${row.anneResmi ? '<img src="'+row.anneResmi+'" class="table-img">' : '<span style="color:#999; font-size:0.8rem;">Yok</span>'}</td>
+                        <td>
+                            <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>Düzenle</button>
+                            <button class="btn-danger" onclick="deleteData(${row.id})">Sil</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // 6. Sayfalama (Pagination) Butonlarını Çizme
+        function renderPagination() {
+            const paginationDiv = document.getElementById('pagination');
+            paginationDiv.innerHTML = "";
+            
+            const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+            
+            if (totalPages <= 1) return; // Tek sayfa varsa butonları gizle
+
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.innerText = i;
+                btn.className = i === currentPage ? 'page-btn active' : 'page-btn';
+                btn.onclick = () => {
+                    currentPage = i;
+                    renderTable();
+                    renderPagination();
+                };
+                paginationDiv.appendChild(btn);
+            }
+        }
+
+        // Düzenleme (Edit) Modunu Başlatma
         window.startEdit = function(row) {
             document.getElementById('formTitle').innerText = "Kayıt Düzenle";
             document.getElementById('submitBtn').innerText = "Güncelle";
@@ -240,7 +310,7 @@
             if(base64Hayvan) { prevHayvan.src = base64Hayvan; prevHayvan.style.display = 'block'; } else { prevHayvan.style.display = 'none'; }
             if(base64Anne) { prevAnne.src = base64Anne; prevAnne.style.display = 'block'; } else { prevAnne.style.display = 'none'; }
             
-            window.scrollTo(0, 0); // Sayfanın en üstüne formun olduğu yere çık
+            window.scrollTo(0, 0); 
         };
 
         // Düzenleme Modundan Çıkma
@@ -265,72 +335,49 @@
             }
         };
 
-        // 6. Tarihli Excel Export (Sadece Raporlama)
+        // Excel Export
         window.exportExcel = function() {
-            const tx = db.transaction("kayitlar", "readonly");
-            const request = tx.objectStore("kayitlar").getAll();
-
-            request.onsuccess = () => {
-                const data = request.result.map(row => ({
-                    "Küpe Numarası": row.kupeNo,
-                    "Cinsiyeti": row.cinsiyet,
-                    "Hayvanın Cinsi": row.hayvanCinsi,
-                    "Doğum Tarihi": row.dogumTarihi,
-                    "Koğuştuğu Tarih": row.kogustuguTarih,
-                    "Anne Küpe Numarası": row.anneKupeNo,
-                    "Annesinin Cinsi": row.anneCinsi
-                }));
-
-                const worksheet = XLSX.utils.json_to_sheet(data);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, "Hayvanlar");
-
-                // Tarihi alıp dosya ismine ekleme (Örn: 2026-07-28)
-                const today = new Date().toISOString().split('T')[0];
-                XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}.xlsx`);
-            };
+            const data = allData.map(row => ({
+                "Küpe Numarası": row.kupeNo,
+                "Cinsiyeti": row.cinsiyet,
+                "Hayvanın Cinsi": row.hayvanCinsi,
+                "Doğum Tarihi": row.dogumTarihi,
+                "Koğuştuğu Tarih": row.kogustuguTarih,
+                "Anne Küpe Numarası": row.anneKupeNo,
+                "Annesinin Cinsi": row.anneCinsi
+            }));
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Hayvanlar");
+            const today = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}.xlsx`);
         };
 
-        // 7. JSON Export (Fotoğraflı Tam Yedek)
+        // JSON Export
         window.exportJSON = function() {
-            const tx = db.transaction("kayitlar", "readonly");
-            const request = tx.objectStore("kayitlar").getAll();
-
-            request.onsuccess = () => {
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(request.result));
-                const today = new Date().toISOString().split('T')[0];
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}.json`);
-                document.body.appendChild(downloadAnchorNode);
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
+            const today = new Date().toISOString().split('T')[0];
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
         };
 
-        // 8. JSON Import (Yedekten Geri Yükleme - Cihazlar Arası Senkronizasyon)
+        // JSON Import
         window.importJSON = function(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
                     const tx = db.transaction("kayitlar", "readwrite");
                     const store = tx.objectStore("kayitlar");
-                    
-                    data.forEach(item => {
-                        store.put(item); // Varsa günceller, yoksa ekler (ID'ye göre)
-                    });
-
-                    tx.oncomplete = () => {
-                        alert("Yedek başarıyla yüklendi!");
-                        loadData();
-                    };
-                } catch (err) {
-                    alert("Geçersiz yedek dosyası!");
-                }
+                    data.forEach(item => store.put(item));
+                    tx.oncomplete = () => { alert("Yedek yüklendi!"); loadData(); };
+                } catch (err) { alert("Geçersiz yedek dosyası!"); }
             };
             reader.readAsText(file);
         };
