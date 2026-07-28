@@ -10,6 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Çiftlik Veri">
     <!-- Kendi indirdiğin ikonu buraya bağlıyorsun -->
+     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./cow.png">
     <link rel="icon" type="image/png" href="./cow.png">
 
@@ -311,14 +312,14 @@
             const endIndex = startIndex + rowsPerPage;
             const pageData = filteredData.slice(startIndex, endIndex);
 
-            pageData.forEach(row => {
+            pageData.forEach((row, index) => {
                 // onclick="openModal(this.src)" kodu sayesinde resimler tıklanabilir hale gelir ve büyütme fonksiyonunu tetikler
                 const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
                 const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
 
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${row.id}</strong></td>
+                        <td><strong>${index + 1}</strong></td>
                         <td>${row.kupeNo}</td>
                         <td>${row.hayvanLakabi || '-'}</td>
                         <td>${row.cinsiyet}</td>
@@ -470,6 +471,17 @@
             };
             reader.readAsText(file);
         };
+    </script>
+
+    <script>
+        // Service Worker Kaydı (Çevrimdışı Çalışma İçin)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Çevrimdışı mod aktif.', reg))
+                    .catch(err => console.log('Service worker hatası', err));
+            });
+        }
     </script>
 </body>
 </html>
