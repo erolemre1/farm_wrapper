@@ -4,8 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Çiftlik Veri Yönetimi</title>
+    
+    <!-- Mobil İkon (PWA) Ayarları -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Çiftlik Veri">
+
+    <!-- Kendi indirdiğin ikonu buraya bağlıyorsun -->
+    <link rel="apple-touch-icon" href="./cow.png">
+    <link rel="icon" type="image/png" href="./cow.png">
     <!-- Excel işlemleri için kütüphane -->
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script> -->
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; background: #f4f4f9; }
         .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
@@ -22,7 +31,10 @@
         .btn-info { background: #17a2b8; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
         
         .preview { max-width: 80px; max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
-        .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
+        
+        /* Resimlerin tıklanabilir olduğunu belirten stil */
+        .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
+        .table-img:hover { opacity: 0.8; }
         
         .search-box { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; box-sizing: border-box; }
         .action-buttons { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
@@ -37,6 +49,11 @@
         .pagination { display: flex; gap: 5px; justify-content: center; margin-top: 15px; }
         .page-btn { padding: 5px 12px; background: #e9ecef; color: black; border-radius: 4px; margin: 0; }
         .page-btn.active { background: #0056b3; color: white; }
+
+        /* Resim Büyütme (Modal) Stilleri */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
+        .modal-content { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .close-modal { position: absolute; top: 20px; right: 35px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; user-select: none; }
     </style>
 </head>
 <body>
@@ -159,6 +176,12 @@
         <div id="pagination" class="pagination"></div>
     </div>
 
+    <!-- Resim Büyütme Modalı -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="expandedImg">
+    </div>
+
     <script>
         let db;
         let base64Hayvan = "";
@@ -273,15 +296,15 @@
             tbody.innerHTML = "";
             
             if (filteredData.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="11" style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
-                    Aradığınız kriterlere uygun kayıt bulunamadı.
-                </td>
-            </tr>
-        `;
-        return; // İşlemi burada kesip alt kısımdaki çizim kodlarını çalıştırmıyoruz
-    }
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="11" style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
+                            Aradığınız kriterlere uygun kayıt bulunamadı.
+                        </td>
+                    </tr>
+                `;
+                return; 
+            }
     
             // Sayfalama hesaplamaları
             const startIndex = (currentPage - 1) * rowsPerPage;
@@ -289,6 +312,10 @@
             const pageData = filteredData.slice(startIndex, endIndex);
 
             pageData.forEach(row => {
+                // onclick="openModal(this.src)" eklenerek resimler tıklanabilir hale getirildi
+                const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
+                const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
+
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>${row.id}</strong></td>
@@ -299,8 +326,8 @@
                         <td>${row.dogumTarihi}</td>
                         <td>${row.kogustuguTarih}</td>
                         <td>${row.anneKupeNo || '-'}</td>
-                        <td>${row.hayvanResmi ? '<img src="'+row.hayvanResmi+'" class="table-img">' : '<span style="color:#999; font-size:0.8rem;">Yok</span>'}</td>
-                        <td>${row.anneResmi ? '<img src="'+row.anneResmi+'" class="table-img">' : '<span style="color:#999; font-size:0.8rem;">Yok</span>'}</td>
+                        <td>${hayvanResmiHtml}</td>
+                        <td>${anneResmiHtml}</td>
                         <td>
                             <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>Düzenle</button>
                             <button class="btn-danger" onclick="deleteData(${row.id})">Sil</button>
@@ -382,25 +409,37 @@
             }
         };
 
-        // Excel Export
-        window.exportExcel = function() {
-            const data = allData.map(row => ({
-                "Küpe Numarası": row.kupeNo,
-                "Hayvan Lakabı": row.hayvanLakabi || "-",
-                "Cinsiyeti": row.cinsiyet,
-                "Hayvanın Cinsi": row.hayvanCinsi,
-                "Doğum Tarihi": row.dogumTarihi,
-                "Koğuştuğu Tarih": row.kogustuguTarih,
-                "Anne Küpe Numarası": row.anneKupeNo,
-                "Annesinin Cinsi": row.anneCinsi
-            }));
-            const worksheet = XLSX.utils.json_to_sheet(data);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Hayvanlar");
-            const today = new Date().toISOString().split('T')[0];
-            const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
-            XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}_${todayTime}.xlsx`);
+        // Resim Büyütme Fonksiyonları
+        window.openModal = function(src) {
+            const modal = document.getElementById("imageModal");
+            const modalImg = document.getElementById("expandedImg");
+            modal.style.display = "flex";
+            modalImg.src = src;
         };
+
+        window.closeModal = function() {
+            document.getElementById("imageModal").style.display = "none";
+        };
+
+        // Excel Export
+        // window.exportExcel = function() {
+        //     const data = allData.map(row => ({
+        //         "Küpe Numarası": row.kupeNo,
+        //         "Hayvan Lakabı": row.hayvanLakabi || "-",
+        //         "Cinsiyeti": row.cinsiyet,
+        //         "Hayvanın Cinsi": row.hayvanCinsi,
+        //         "Doğum Tarihi": row.dogumTarihi,
+        //         "Koğuştuğu Tarih": row.kogustuguTarih,
+        //         "Anne Küpe Numarası": row.anneKupeNo,
+        //         "Annesinin Cinsi": row.anneCinsi
+        //     }));
+        //     const worksheet = XLSX.utils.json_to_sheet(data);
+        //     const workbook = XLSX.utils.book_new();
+        //     XLSX.utils.book_append_sheet(workbook, worksheet, "Hayvanlar");
+        //     const today = new Date().toISOString().split('T')[0];
+        //     const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
+        //     XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}_${todayTime}.xlsx`);
+        // };
 
         // JSON Export
         window.exportJSON = function() {
