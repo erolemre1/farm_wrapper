@@ -31,9 +31,14 @@
         .btn-danger { background: #dc3545; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
         .btn-info { background: #17a2b8; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
         
-        .preview { max-width: 80px; max-height: 80px; margin-top: 5px; display: none; border-radius: 4px; }
+        /* Formdaki Resim Önizleme ve Silme Stilleri */
+        .preview-container { position: relative; display: inline-block; margin-top: 5px; }
+        .preview { max-width: 80px; max-height: 80px; display: none; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
+        .preview:hover { opacity: 0.8; }
+        .remove-img-btn { position: absolute; top: -10px; right: -10px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .remove-img-btn:hover { background: #c82333; }
         
-        /* Resimlerin tıklanabilir olduğunu belirten stil */
+        /* Resimlerin tıklanabilir olduğunu belirten stil (Tablo İçin) */
         .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
         .table-img:hover { opacity: 0.8; }
         
@@ -122,12 +127,18 @@
                 <div class="form-group">
                     <label>Hayvanın Resmi</label>
                     <input type="file" id="hayvanResmi" accept="image/*">
-                    <img id="previewHayvan" class="preview">
+                    <div class="preview-container">
+                        <img id="previewHayvan" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
+                        <button type="button" class="remove-img-btn" id="removeHayvanBtn" onclick="removeImage('hayvan')">&times;</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Anne Resmi</label>
                     <input type="file" id="anneResmi" accept="image/*">
-                    <img id="previewAnne" class="preview">
+                    <div class="preview-container">
+                        <img id="previewAnne" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
+                        <button type="button" class="remove-img-btn" id="removeAnneBtn" onclick="removeImage('anne')">&times;</button>
+                    </div>
                 </div>
             </div>
 
@@ -214,8 +225,13 @@
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onloadend = () => {
-                    if (isAnne) base64Anne = reader.result;
-                    else base64Hayvan = reader.result;
+                    if (isAnne) {
+                        base64Anne = reader.result;
+                        document.getElementById('removeAnneBtn').style.display = 'flex';
+                    } else {
+                        base64Hayvan = reader.result;
+                        document.getElementById('removeHayvanBtn').style.display = 'flex';
+                    }
                     
                     const imgObj = document.getElementById(previewId);
                     imgObj.src = reader.result;
@@ -226,6 +242,23 @@
         }
         handleImageUpload('hayvanResmi', 'previewHayvan', false);
         handleImageUpload('anneResmi', 'previewAnne', true);
+
+        // Fotoğraf Silme İşlemi (Form İçin)
+        window.removeImage = function(type) {
+            if (type === 'hayvan') {
+                base64Hayvan = "";
+                document.getElementById('hayvanResmi').value = ""; // Inputu temizle
+                document.getElementById('previewHayvan').style.display = 'none';
+                document.getElementById('removeHayvanBtn').style.display = 'none';
+                document.getElementById('previewHayvan').src = "";
+            } else if (type === 'anne') {
+                base64Anne = "";
+                document.getElementById('anneResmi').value = ""; // Inputu temizle
+                document.getElementById('previewAnne').style.display = 'none';
+                document.getElementById('removeAnneBtn').style.display = 'none';
+                document.getElementById('previewAnne').src = "";
+            }
+        };
 
         // 3. Form Kaydetme
         document.getElementById('animalForm').addEventListener('submit', (e) => {
@@ -313,7 +346,6 @@
             const pageData = filteredData.slice(startIndex, endIndex);
 
             pageData.forEach((row, index) => {
-                // onclick="openModal(this.src)" kodu sayesinde resimler tıklanabilir hale gelir ve büyütme fonksiyonunu tetikler
                 const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
                 const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
 
@@ -382,8 +414,25 @@
             const prevHayvan = document.getElementById('previewHayvan');
             const prevAnne = document.getElementById('previewAnne');
 
-            if(base64Hayvan) { prevHayvan.src = base64Hayvan; prevHayvan.style.display = 'block'; } else { prevHayvan.style.display = 'none'; }
-            if(base64Anne) { prevAnne.src = base64Anne; prevAnne.style.display = 'block'; } else { prevAnne.style.display = 'none'; }
+            // Hayvan resmi varsa göster ve sil butonunu aktif et
+            if(base64Hayvan) { 
+                prevHayvan.src = base64Hayvan; 
+                prevHayvan.style.display = 'block'; 
+                document.getElementById('removeHayvanBtn').style.display = 'flex';
+            } else { 
+                prevHayvan.style.display = 'none'; 
+                document.getElementById('removeHayvanBtn').style.display = 'none';
+            }
+            
+            // Anne resmi varsa göster ve sil butonunu aktif et
+            if(base64Anne) { 
+                prevAnne.src = base64Anne; 
+                prevAnne.style.display = 'block'; 
+                document.getElementById('removeAnneBtn').style.display = 'flex';
+            } else { 
+                prevAnne.style.display = 'none'; 
+                document.getElementById('removeAnneBtn').style.display = 'none';
+            }
             
             window.scrollTo(0, 0); 
         };
@@ -395,8 +444,13 @@
             document.getElementById('formTitle').innerText = "Yeni Hayvan Ekle";
             document.getElementById('submitBtn').innerText = "Kaydet";
             document.getElementById('cancelEditBtn').style.display = "none";
+            
+            // Resim önizlemelerini ve sil butonlarını gizle
             document.getElementById('previewHayvan').style.display = 'none';
             document.getElementById('previewAnne').style.display = 'none';
+            document.getElementById('removeHayvanBtn').style.display = 'none';
+            document.getElementById('removeAnneBtn').style.display = 'none';
+            
             base64Hayvan = "";
             base64Anne = "";
         };
@@ -412,6 +466,9 @@
 
         // Resim Büyütme (Modal) Fonksiyonları
         window.openModal = function(src) {
+            // Eğer src boşsa modalı açma
+            if (!src || src.endsWith('null') || src === "") return;
+            
             const modal = document.getElementById("imageModal");
             const modalImg = document.getElementById("expandedImg");
             modal.style.display = "flex";
@@ -421,8 +478,7 @@
         window.closeModal = function() {
             document.getElementById("imageModal").style.display = "none";
         };
-
-        // Excel Export
+     // Excel Export
         // window.exportExcel = function() {
         //     const data = allData.map(row => ({
         //         "Küpe Numarası": row.kupeNo,
@@ -441,7 +497,6 @@
         //     const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
         //     XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}_${todayTime}.xlsx`);
         // };
-
         // JSON Export
         window.exportJSON = function() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
@@ -455,8 +510,7 @@
             downloadAnchorNode.remove();
         };
 
-        // JSON Import
-// JSON Import (Tamamen Üzerine Yazma Mantığıyla)
+        // JSON Import (Tamamen Üzerine Yazma Mantığıyla)
         window.importJSON = function(event) {
             const file = event.target.files[0];
             if (!file) return;
