@@ -9,13 +9,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Çiftlik Veri">
-    <!-- Kendi indirdiğin ikonu buraya bağlıyorsun -->
-     <link rel="manifest" href="./manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./cow.png">
     <link rel="icon" type="image/png" href="./cow.png">
 
-    <!-- Excel işlemleri için kütüphane -->
-    <!-- <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script> -->
+    <!-- WebRTC, Karekod Oluşturucu ve Karekod Okuyucu Kütüphaneleri -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; background: #f4f4f9; }
         .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
@@ -147,8 +149,28 @@
         </form>
     </div>
 
+    <!-- WebRTC Cihazlar Arası Aktarım Kartı -->
+    <div class="card" id="syncCard">
+        <h2 style="margin-top: 0;">🔄 Cihazlar Arası Hızlı Aktarım (Karekod)</h2>
+        <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Uygulamayı bir cihazda alıcı, diğer cihazda gönderici olarak ayarlayarak verilerinizi saniyeler içinde senkronize edebilirsiniz.</p>
+        <div class="grid">
+            <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                <h3 style="margin-top: 0;">💻 Alıcı Cihaz (Örn: Bilgisayar)</h3>
+                <p style="font-size: 0.85rem;">Verileri bu cihaza almak için bağlantı karekodu oluşturun.</p>
+                <button class="btn-info" style="width: 100%;" onclick="generateReceiveQR()">Alıcı Karekodu Oluştur</button>
+                <div id="qrcode-container" style="display: flex; justify-content: center; margin-top: 15px;"></div>
+                <p id="peer-status" style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">Bağlantı bekleniyor...</p>
+            </div>
+            <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                <h3 style="margin-top: 0;">📱 Gönderici Cihaz (Örn: Telefon)</h3>
+                <p style="font-size: 0.85rem;">Bu cihazdaki verileri alıcıya göndermek için karekodu okutun.</p>
+                <button class="btn-primary" style="background: #6f42c1; width: 100%;" onclick="startQRScanner()">Kamerayı Aç ve Okut</button>
+                <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="action-buttons">
-        <!-- <button class="btn-success" onclick="exportExcel()">📊 Excel Olarak İndir</button> -->
         <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
         <div>
             <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
@@ -203,7 +225,7 @@
         let allData = [];
         let filteredData = [];
         let currentPage = 1;
-        const rowsPerPage = 5; // Sayfa başına gösterilecek kayıt sayısı
+        const rowsPerPage = 5; 
 
         // 1. Veritabanı Kurulumu
         const request = indexedDB.open("CiftlikPro", 1);
@@ -243,17 +265,17 @@
         handleImageUpload('hayvanResmi', 'previewHayvan', false);
         handleImageUpload('anneResmi', 'previewAnne', true);
 
-        // Fotoğraf Silme İşlemi (Form İçin)
+        // Fotoğraf Silme İşlemi
         window.removeImage = function(type) {
             if (type === 'hayvan') {
                 base64Hayvan = "";
-                document.getElementById('hayvanResmi').value = ""; // Inputu temizle
+                document.getElementById('hayvanResmi').value = ""; 
                 document.getElementById('previewHayvan').style.display = 'none';
                 document.getElementById('removeHayvanBtn').style.display = 'none';
                 document.getElementById('previewHayvan').src = "";
             } else if (type === 'anne') {
                 base64Anne = "";
-                document.getElementById('anneResmi').value = ""; // Inputu temizle
+                document.getElementById('anneResmi').value = ""; 
                 document.getElementById('previewAnne').style.display = 'none';
                 document.getElementById('removeAnneBtn').style.display = 'none';
                 document.getElementById('previewAnne').src = "";
@@ -298,12 +320,8 @@
             const request = tx.objectStore("kayitlar").getAll();
 
             request.onsuccess = () => {
-                // ID'ye göre küçükten büyüğe sıralama
                 allData = request.result.sort((a, b) => a.id - b.id); 
-                
-                // Toplam hayvan sayısını güncelleme
                 document.getElementById('totalCount').innerText = "Toplam Hayvan Sayısı: " + allData.length;
-                
                 applyFilter();
             };
         }
@@ -319,12 +337,12 @@
                 return kupe.includes(searchTerm) || cins.includes(searchTerm) || lakap.includes(searchTerm);
             });
             
-            currentPage = 1; // Arama yapıldığında her zaman 1. sayfaya dön
+            currentPage = 1; 
             renderTable();
             renderPagination();
         };
 
-        // 5. Tabloyu Çizme (Sayfalamalı)
+        // 5. Tabloyu Çizme
         function renderTable() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
@@ -340,7 +358,6 @@
                 return; 
             }
     
-            // Sayfalama hesaplamaları
             const startIndex = (currentPage - 1) * rowsPerPage;
             const endIndex = startIndex + rowsPerPage;
             const pageData = filteredData.slice(startIndex, endIndex);
@@ -351,7 +368,7 @@
 
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${index + 1}</strong></td>
+                        <td><strong>${startIndex + index + 1}</strong></td>
                         <td>${row.kupeNo}</td>
                         <td>${row.hayvanLakabi || '-'}</td>
                         <td>${row.cinsiyet}</td>
@@ -370,14 +387,14 @@
             });
         }
 
-        // 6. Sayfalama (Pagination) Butonlarını Çizme
+        // 6. Sayfalama
         function renderPagination() {
             const paginationDiv = document.getElementById('pagination');
             paginationDiv.innerHTML = "";
             
             const totalPages = Math.ceil(filteredData.length / rowsPerPage);
             
-            if (totalPages <= 1) return; // Tek sayfa varsa butonları gizle
+            if (totalPages <= 1) return; 
 
             for (let i = 1; i <= totalPages; i++) {
                 const btn = document.createElement('button');
@@ -392,7 +409,7 @@
             }
         }
 
-        // Düzenleme (Edit) Modunu Başlatma
+        // Düzenleme Modu
         window.startEdit = function(row) {
             document.getElementById('formTitle').innerText = "Kayıt Düzenle";
             document.getElementById('submitBtn').innerText = "Güncelle";
@@ -414,7 +431,6 @@
             const prevHayvan = document.getElementById('previewHayvan');
             const prevAnne = document.getElementById('previewAnne');
 
-            // Hayvan resmi varsa göster ve sil butonunu aktif et
             if(base64Hayvan) { 
                 prevHayvan.src = base64Hayvan; 
                 prevHayvan.style.display = 'block'; 
@@ -424,7 +440,6 @@
                 document.getElementById('removeHayvanBtn').style.display = 'none';
             }
             
-            // Anne resmi varsa göster ve sil butonunu aktif et
             if(base64Anne) { 
                 prevAnne.src = base64Anne; 
                 prevAnne.style.display = 'block'; 
@@ -437,7 +452,7 @@
             window.scrollTo(0, 0); 
         };
 
-        // Düzenleme Modundan Çıkma
+        // Düzenleme İptal
         window.cancelEdit = function() {
             document.getElementById('animalForm').reset();
             document.getElementById('editId').value = "";
@@ -445,7 +460,6 @@
             document.getElementById('submitBtn').innerText = "Kaydet";
             document.getElementById('cancelEditBtn').style.display = "none";
             
-            // Resim önizlemelerini ve sil butonlarını gizle
             document.getElementById('previewHayvan').style.display = 'none';
             document.getElementById('previewAnne').style.display = 'none';
             document.getElementById('removeHayvanBtn').style.display = 'none';
@@ -464,11 +478,9 @@
             }
         };
 
-        // Resim Büyütme (Modal) Fonksiyonları
+        // Resim Büyütme
         window.openModal = function(src) {
-            // Eğer src boşsa modalı açma
             if (!src || src.endsWith('null') || src === "") return;
-            
             const modal = document.getElementById("imageModal");
             const modalImg = document.getElementById("expandedImg");
             modal.style.display = "flex";
@@ -478,7 +490,7 @@
         window.closeModal = function() {
             document.getElementById("imageModal").style.display = "none";
         };
-     // Excel Export
+    // Excel Export
         // window.exportExcel = function() {
         //     const data = allData.map(row => ({
         //         "Küpe Numarası": row.kupeNo,
@@ -510,14 +522,13 @@
             downloadAnchorNode.remove();
         };
 
-        // JSON Import (Tamamen Üzerine Yazma Mantığıyla)
+        // JSON Import
         window.importJSON = function(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            // Yanlışlıkla veri kaybını önlemek için onay istiyoruz
             if(!confirm("DİKKAT: Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK ve sadece yedekteki veriler yüklenecektir. Onaylıyor musunuz?")) {
-                event.target.value = ''; // İptal edilirse dosya seçimini sıfırla
+                event.target.value = ''; 
                 return;
             }
 
@@ -528,10 +539,7 @@
                     const tx = db.transaction("kayitlar", "readwrite");
                     const store = tx.objectStore("kayitlar");
                     
-                    // 1. ADIM: Mevcut veritabanını tamamen temizle
                     store.clear();
-
-                    // 2. ADIM: Yedek dosyasındaki verileri tertemiz veritabanına yaz
                     data.forEach(item => store.put(item));
                     
                     tx.oncomplete = () => { 
@@ -544,6 +552,101 @@
             };
             reader.readAsText(file);
         };
+    </script>
+
+    <!-- WebRTC ve PeerJS Cihazlar Arası Aktarım Mantığı -->
+    <script>
+        let peer = null;
+
+        // 1. Alıcı Cihazda Karekod Oluşturma
+        window.generateReceiveQR = function() {
+            if (!peer || peer.destroyed) {
+                peer = new Peer(); 
+                
+                peer.on('open', function(id) {
+                    document.getElementById('qrcode-container').innerHTML = "";
+                    new QRCode(document.getElementById("qrcode-container"), id);
+                    document.getElementById('peer-status').style.display = 'block';
+                    document.getElementById('peer-status').innerText = 'Bağlantı bekleniyor... (Uygulamayı kapatmayın)';
+                });
+
+                // Veri geldiğinde yakala
+                peer.on('connection', function(conn) {
+                    conn.on('data', function(data) {
+                        if(confirm("Karşı cihazdan yeni veriler geldi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
+                            const tx = db.transaction("kayitlar", "readwrite");
+                            const store = tx.objectStore("kayitlar");
+                            
+                            store.clear();
+                            data.forEach(item => store.put(item));
+                            
+                            tx.oncomplete = () => { 
+                                alert("Veriler başarıyla aktarıldı!"); 
+                                loadData(); 
+                            };
+                        }
+                    });
+                });
+            } else {
+                alert("Karekod zaten oluşturuldu. Gönderici cihazdan okutabilirsiniz.");
+            }
+        };
+
+        // 2. Gönderici Cihazda Kamerayı Açma
+        window.startQRScanner = function() {
+            document.getElementById('reader').style.display = 'block';
+            const html5QrCode = new Html5Qrcode("reader");
+
+            html5QrCode.start(
+                { facingMode: "environment" }, // Arka kamera
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                (decodedText, decodedResult) => {
+                    html5QrCode.stop();
+                    document.getElementById('reader').style.display = 'none';
+                    // Okunan ID'ye veriyi gönder
+                    sendDataToPeer(decodedText);
+                },
+                (errorMessage) => {
+                    // Kamera okuma yaparken burası tetiklenir (Gizli tutulabilir)
+                }
+            ).catch((err) => {
+                alert("Kamera başlatılamadı: " + err);
+            });
+        };
+
+        // 3. Gönderici Cihazdan Veriyi Karşıya Fırlatma
+        function sendDataToPeer(targetPeerId) {
+            if (!peer || peer.destroyed) {
+                peer = new Peer();
+            }
+
+            const connectAndSend = () => {
+                const tx = db.transaction("kayitlar", "readonly");
+                const request = tx.objectStore("kayitlar").getAll();
+
+                request.onsuccess = () => {
+                    const allData = request.result;
+                    const conn = peer.connect(targetPeerId);
+                    
+                    conn.on('open', function() {
+                        conn.send(allData);
+                        alert("Veriler karşı cihaza başarıyla gönderildi!");
+                    });
+                    
+                    conn.on('error', function(err) {
+                        alert("Gönderim hatası: Bağlantı kurulamadı.");
+                    });
+                };
+            };
+
+            if (peer.open) {
+                connectAndSend();
+            } else {
+                peer.on('open', () => {
+                    connectAndSend();
+                });
+            }
+        }
     </script>
 
     <script>
