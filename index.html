@@ -33,14 +33,12 @@
         .btn-danger { background: #dc3545; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
         .btn-info { background: #17a2b8; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
         
-        /* Formdaki Resim Önizleme ve Silme Stilleri */
         .preview-container { position: relative; display: inline-block; margin-top: 5px; }
         .preview { max-width: 80px; max-height: 80px; display: none; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
         .preview:hover { opacity: 0.8; }
         .remove-img-btn { position: absolute; top: -10px; right: -10px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .remove-img-btn:hover { background: #c82333; }
         
-        /* Resimlerin tıklanabilir olduğunu belirten stil (Tablo İçin) */
         .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
         .table-img:hover { opacity: 0.8; }
         
@@ -53,181 +51,236 @@
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle; }
         th { background: #f8f9fa; }
         
-        /* Sayfalama (Pagination) Stilleri */
         .pagination { display: flex; gap: 5px; justify-content: center; margin-top: 15px; }
         .page-btn { padding: 5px 12px; background: #e9ecef; color: black; border-radius: 4px; margin: 0; }
         .page-btn.active { background: #0056b3; color: white; }
 
-        /* Resim Büyütme (Modal) Stilleri */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
         .modal-content { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .close-modal { position: absolute; top: 20px; right: 35px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; user-select: none; }
+
+        /* Şifre Ekranı Stilleri */
+        #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; }
+        .login-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+        .login-card h2 { margin-top: 0; color: #333; }
+        .login-card input { font-size: 1.1rem; padding: 0.8rem; text-align: center; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2 id="formTitle">Yeni Hayvan Ekle</h2>
-        <form id="animalForm">
-            <input type="hidden" id="editId">
+    <!-- ŞİFRE EKRANI -->
+    <div id="loginScreen">
+        <div class="login-card">
+            <h2>🔒 Çiftlik Veri Girişi</h2>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">Lütfen devam etmek için şifrenizi girin.</p>
+            <input type="password" id="appPassword" placeholder="Şifrenizi Girin" onkeypress="handleEnter(event)">
+            <button class="btn-primary" onclick="checkPassword()">Giriş Yap</button>
+            <p id="passwordError" style="color: #dc3545; font-size: 0.9rem; display: none; margin-top: 10px; font-weight: bold;">Hatalı Şifre!</p>
+        </div>
+    </div>
+
+    <!-- ANA UYGULAMA (Başlangıçta Gizli) -->
+    <div id="mainApp" style="display: none;">
+        
+        <div class="card">
+            <h2 id="formTitle">Yeni Hayvan Ekle</h2>
+            <form id="animalForm">
+                <input type="hidden" id="editId">
+                <div class="grid">
+                    <div class="form-group">
+                        <label>Küpe Numarası</label>
+                        <input type="text" id="kupeNo" inputmode="numeric" pattern="[0-9]*" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Hayvan Lakabı</label>
+                        <input type="text" id="hayvanLakabi">
+                    </div>
+                    <div class="form-group">
+                        <label>Cinsiyeti</label>
+                        <select id="cinsiyet" required>
+                            <option value="">Seçiniz...</option>
+                            <option value="Erkek">Erkek</option>
+                            <option value="Dişi">Dişi</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Hayvanın Cinsi (Irkı)</label>
+                        <select id="hayvanCinsi" required>
+                            <option value="">Seçiniz...</option>
+                                <option value="simental">Simental </option>
+                                <option value="hollanda">Hollanda </option>
+                                <option value="simental-kırma">Simental Kırma </option>
+                                <option value="hollanda-kırma">Hollanda Kırma </option>
+                                <option value="montofon">Montofon</option>
+                                <option value="boz">Boz</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Doğum Tarihi</label>
+                        <input type="date" id="dogumTarihi" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Anne Küpe Numarası</label>
+                        <input type="text" id="anneKupeNo" inputmode="numeric" pattern="[0-9]*">
+                    </div>
+                    <div class="form-group">
+                        <label>Annesinin Cinsi (Irkı)</label>
+                        <select id="anneCinsi">
+                            <option value="">Seçiniz (Zorunlu Değil)</option>
+                                <option value="simental">Simental </option>
+                                <option value="hollanda">Hollanda </option>
+                                <option value="simental-kırma">Simental Kırma </option>
+                                <option value="hollanda-kırma">Hollanda Kırma </option>
+                                <option value="montofon">Montofon</option>
+                                <option value="boz">Boz</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Koğuştuğu Tarih</label>
+                        <input type="date" id="kogustuguTarih">
+                    </div>
+                </div>
+                
+                <div class="grid">
+                    <div class="form-group">
+                        <label>Hayvanın Resmi</label>
+                        <input type="file" id="hayvanResmi" accept="image/*">
+                        <div class="preview-container">
+                            <img id="previewHayvan" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
+                            <button type="button" class="remove-img-btn" id="removeHayvanBtn" onclick="removeImage('hayvan')">&times;</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Anne Resmi</label>
+                        <input type="file" id="anneResmi" accept="image/*">
+                        <div class="preview-container">
+                            <img id="previewAnne" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
+                            <button type="button" class="remove-img-btn" id="removeAnneBtn" onclick="removeImage('anne')">&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary" id="submitBtn">Kaydet</button>
+                <button type="button" class="btn-warning" id="cancelEditBtn" style="display:none; width: 100%; margin-top:5px;" onclick="cancelEdit()">İptal Et</button>
+            </form>
+        </div>
+
+        <div class="card" id="syncCard">
+            <h2 style="margin-top: 0;">🔄 Cihazlar Arası Hızlı Aktarım (Karekod)</h2>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Uygulamayı bir cihazda alıcı, diğer cihazda gönderici olarak ayarlayarak verilerinizi saniyeler içinde senkronize edebilirsiniz.</p>
             <div class="grid">
-                <div class="form-group">
-                    <label>Küpe Numarası</label>
-                    <input type="text" id="kupeNo" inputmode="numeric" pattern="[0-9]*" required>
+                <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                    <h3 style="margin-top: 0;">💻 Alıcı Cihaz (Örn: Bilgisayar)</h3>
+                    <p style="font-size: 0.85rem;">Verileri bu cihaza almak için bağlantı karekodu oluşturun.</p>
+                    <button class="btn-info" style="width: 100%;" onclick="generateReceiveQR()">Alıcı Karekodu Oluştur</button>
+                    <div id="qrcode-container" style="display: flex; justify-content: center; margin-top: 15px;"></div>
+                    <p id="peer-status" style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">Bağlantı bekleniyor...</p>
                 </div>
-                <div class="form-group">
-                    <label>Hayvan Lakabı</label>
-                    <input type="text" id="hayvanLakabi">
-                </div>
-                <div class="form-group">
-                    <label>Cinsiyeti</label>
-                    <select id="cinsiyet" required>
-                        <option value="">Seçiniz...</option>
-                        <option value="Erkek">Erkek</option>
-                        <option value="Dişi">Dişi</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Hayvanın Cinsi (Irkı)</label>
-                    <select id="hayvanCinsi" required>
-                        <option value="">Seçiniz...</option>
-                            <option value="simental">Simental </option>
-                            <option value="hollanda">Hollanda </option>
-                            <option value="simental-kırma">Simental Kırma </option>
-                            <option value="hollanda-kırma">Hollanda Kırma </option>
-                            <option value="montofon">Montofon</option>
-                            <option value="boz">Boz</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Doğum Tarihi</label>
-                    <input type="date" id="dogumTarihi" required>
-                </div>
-                <div class="form-group">
-                    <label>Anne Küpe Numarası</label>
-                    <input type="text" id="anneKupeNo" inputmode="numeric" pattern="[0-9]*">
-                </div>
-                <div class="form-group">
-                    <label>Annesinin Cinsi (Irkı)</label>
-                    <select id="anneCinsi">
-                        <option value="">Seçiniz (Zorunlu Değil)</option>
-                            <option value="simental">Simental </option>
-                            <option value="hollanda">Hollanda </option>
-                            <option value="simental-kırma">Simental Kırma </option>
-                            <option value="hollanda-kırma">Hollanda Kırma </option>
-                            <option value="montofon">Montofon</option>
-                            <option value="boz">Boz</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Koğuştuğu Tarih</label>
-                    <input type="date" id="kogustuguTarih">
+                <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                    <h3 style="margin-top: 0;">📱 Gönderici Cihaz (Örn: Telefon)</h3>
+                    <p style="font-size: 0.85rem;">Bu cihazdaki verileri alıcıya göndermek için karekodu okutun.</p>
+                    <button class="btn-primary" style="background: #6f42c1; width: 100%;" onclick="startQRScanner()">Kamerayı Aç ve Okut</button>
+                    <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
                 </div>
             </div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
+            <div>
+                <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
+                    📂 Yedek Yükle (PC-Telefon Aktarımı)
+                    <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJSON(event)">
+                </label>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <!-- Toplam Sayı -->
+            <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
             
-            <div class="grid">
-                <div class="form-group">
-                    <label>Hayvanın Resmi</label>
-                    <input type="file" id="hayvanResmi" accept="image/*">
-                    <div class="preview-container">
-                        <img id="previewHayvan" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
-                        <button type="button" class="remove-img-btn" id="removeHayvanBtn" onclick="removeImage('hayvan')">&times;</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Anne Resmi</label>
-                    <input type="file" id="anneResmi" accept="image/*">
-                    <div class="preview-container">
-                        <img id="previewAnne" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
-                        <button type="button" class="remove-img-btn" id="removeAnneBtn" onclick="removeImage('anne')">&times;</button>
-                    </div>
-                </div>
-            </div>
-
-            <button type="submit" class="btn-primary" id="submitBtn">Kaydet</button>
-            <button type="button" class="btn-warning" id="cancelEditBtn" style="display:none; width: 100%; margin-top:5px;" onclick="cancelEdit()">İptal Et</button>
-        </form>
-    </div>
-
-    <!-- WebRTC Cihazlar Arası Aktarım Kartı -->
-    <div class="card" id="syncCard">
-        <h2 style="margin-top: 0;">🔄 Cihazlar Arası Hızlı Aktarım (Karekod)</h2>
-        <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Uygulamayı bir cihazda alıcı, diğer cihazda gönderici olarak ayarlayarak verilerinizi saniyeler içinde senkronize edebilirsiniz.</p>
-        <div class="grid">
-            <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
-                <h3 style="margin-top: 0;">💻 Alıcı Cihaz (Örn: Bilgisayar)</h3>
-                <p style="font-size: 0.85rem;">Verileri bu cihaza almak için bağlantı karekodu oluşturun.</p>
-                <button class="btn-info" style="width: 100%;" onclick="generateReceiveQR()">Alıcı Karekodu Oluştur</button>
-                <div id="qrcode-container" style="display: flex; justify-content: center; margin-top: 15px;"></div>
-                <p id="peer-status" style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">Bağlantı bekleniyor...</p>
-            </div>
-            <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
-                <h3 style="margin-top: 0;">📱 Gönderici Cihaz (Örn: Telefon)</h3>
-                <p style="font-size: 0.85rem;">Bu cihazdaki verileri alıcıya göndermek için karekodu okutun.</p>
-                <button class="btn-primary" style="background: #6f42c1; width: 100%;" onclick="startQRScanner()">Kamerayı Aç ve Okut</button>
-                <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
-            </div>
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sırası</th>
+                        <th>Küpe No</th>
+                        <th>Lakap</th>
+                        <th>Cinsiyet</th>
+                        <th>Irk</th>
+                        <th>Doğum Tarihi</th>
+                        <th>Koğuştuğu Tarih</th>
+                        <th>Anne Küpe No</th>
+                        <th>Hayvan Resmi</th>
+                        <th>Anne Resmi</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+            
+            <div id="pagination" class="pagination"></div>
         </div>
-    </div>
+    </div> <!-- Main App Kapanış -->
 
-    <div class="action-buttons">
-        <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
-        <div>
-            <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
-                📂 Yedek Yükle (PC-Telefon Aktarımı)
-                <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJSON(event)">
-            </label>
-        </div>
-    </div>
-
-    <div class="table-responsive">
-        <!-- Toplam Sayı -->
-        <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
-        
-        <!-- Arama Kutusu -->
-        <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
-        
-        <table>
-            <thead>
-                <tr>
-                    <th>Sırası</th>
-                    <th>Küpe No</th>
-                    <th>Lakap</th>
-                    <th>Cinsiyet</th>
-                    <th>Irk</th>
-                    <th>Doğum Tarihi</th>
-                    <th>Koğuştuğu Tarih</th>
-                    <th>Anne Küpe No</th>
-                    <th>Hayvan Resmi</th>
-                    <th>Anne Resmi</th>
-                    <th>İşlemler</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-        
-        <!-- Sayfalama (Pagination) Alanı -->
-        <div id="pagination" class="pagination"></div>
-    </div>
-
-    <!-- Resim Büyütme Modalı (Gizli Katman) -->
+    <!-- Resim Büyütme Modalı -->
     <div id="imageModal" class="modal" onclick="closeModal()">
         <span class="close-modal">&times;</span>
         <img class="modal-content" id="expandedImg">
     </div>
 
     <script>
+        const hashed_data = "96a8f45187e9360673b36d3b6fa2dedccae4a05522241b80e8632a41ef4d1be2"; 
+
+        if (sessionStorage.getItem("loggedIn") === "true") {
+            showApp();
+        }
+
+        async function checkPassword() {
+            const input = document.getElementById('appPassword').value;
+            
+            if(!input) return;
+
+            const encoder = new TextEncoder();
+            const data = encoder.encode(input);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+
+            if (hashHex === hashed_data) {
+                sessionStorage.setItem("loggedIn", "true");
+                showApp();
+            } else {
+                document.getElementById('passwordError').style.display = 'block';
+                document.getElementById('appPassword').value = "";
+            }
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+        }
+
+        function handleEnter(e) {
+            if(e.key === 'Enter') {
+                checkPassword();
+            }
+        }
+    </script>
+
+    <script>
         let db;
         let base64Hayvan = "";
         let base64Anne = "";
         
-        // Tablo State Yönetimi
         let allData = [];
         let filteredData = [];
         let currentPage = 1;
         const rowsPerPage = 5; 
 
-        // 1. Veritabanı Kurulumu
         const request = indexedDB.open("CiftlikPro", 1);
         request.onupgradeneeded = (e) => {
             db = e.target.result;
@@ -240,7 +293,6 @@
             loadData();
         };
 
-        // 2. Fotoğraf İşlemleri
         function handleImageUpload(inputId, previewId, isAnne) {
             document.getElementById(inputId).addEventListener('change', function(e) {
                 const file = e.target.files[0];
@@ -265,7 +317,6 @@
         handleImageUpload('hayvanResmi', 'previewHayvan', false);
         handleImageUpload('anneResmi', 'previewAnne', true);
 
-        // Fotoğraf Silme İşlemi
         window.removeImage = function(type) {
             if (type === 'hayvan') {
                 base64Hayvan = "";
@@ -282,7 +333,6 @@
             }
         };
 
-        // 3. Form Kaydetme
         document.getElementById('animalForm').addEventListener('submit', (e) => {
             e.preventDefault();
             
@@ -314,7 +364,6 @@
             };
         });
 
-        // 4. Verileri Çekme ve Filtreleme
         function loadData() {
             const tx = db.transaction("kayitlar", "readonly");
             const request = tx.objectStore("kayitlar").getAll();
@@ -326,7 +375,6 @@
             };
         }
 
-        // Arama (Filtreleme) Fonksiyonu
         window.applyFilter = function() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             
@@ -342,7 +390,6 @@
             renderPagination();
         };
 
-        // 5. Tabloyu Çizme
         function renderTable() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
@@ -387,7 +434,6 @@
             });
         }
 
-        // 6. Sayfalama
         function renderPagination() {
             const paginationDiv = document.getElementById('pagination');
             paginationDiv.innerHTML = "";
@@ -409,7 +455,6 @@
             }
         }
 
-        // Düzenleme Modu
         window.startEdit = function(row) {
             document.getElementById('formTitle').innerText = "Kayıt Düzenle";
             document.getElementById('submitBtn').innerText = "Güncelle";
@@ -452,7 +497,6 @@
             window.scrollTo(0, 0); 
         };
 
-        // Düzenleme İptal
         window.cancelEdit = function() {
             document.getElementById('animalForm').reset();
             document.getElementById('editId').value = "";
@@ -469,7 +513,6 @@
             base64Anne = "";
         };
 
-        // Veri Silme
         window.deleteData = function(id) {
             if(confirm("Bu kaydı silmek istediğinize emin misiniz?")) {
                 const tx = db.transaction("kayitlar", "readwrite");
@@ -478,7 +521,6 @@
             }
         };
 
-        // Resim Büyütme
         window.openModal = function(src) {
             if (!src || src.endsWith('null') || src === "") return;
             const modal = document.getElementById("imageModal");
@@ -490,26 +532,6 @@
         window.closeModal = function() {
             document.getElementById("imageModal").style.display = "none";
         };
-    // Excel Export
-        // window.exportExcel = function() {
-        //     const data = allData.map(row => ({
-        //         "Küpe Numarası": row.kupeNo,
-        //         "Hayvan Lakabı": row.hayvanLakabi || "-",
-        //         "Cinsiyeti": row.cinsiyet,
-        //         "Hayvanın Cinsi": row.hayvanCinsi,
-        //         "Doğum Tarihi": row.dogumTarihi,
-        //         "Koğuştuğu Tarih": row.kogustuguTarih,
-        //         "Anne Küpe Numarası": row.anneKupeNo,
-        //         "Annesinin Cinsi": row.anneCinsi
-        //     }));
-        //     const worksheet = XLSX.utils.json_to_sheet(data);
-        //     const workbook = XLSX.utils.book_new();
-        //     XLSX.utils.book_append_sheet(workbook, worksheet, "Hayvanlar");
-        //     const today = new Date().toISOString().split('T')[0];
-        //     const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
-        //     XLSX.writeFile(workbook, `Ciftlik_Verileri_${today}_${todayTime}.xlsx`);
-        // };
-        // JSON Export
         window.exportJSON = function() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
             const today = new Date().toISOString().split('T')[0];
@@ -522,7 +544,6 @@
             downloadAnchorNode.remove();
         };
 
-        // JSON Import
         window.importJSON = function(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -554,67 +575,69 @@
         };
     </script>
 
-    <!-- WebRTC ve PeerJS Cihazlar Arası Aktarım Mantığı -->
     <script>
         let peer = null;
 
-        // 1. Alıcı Cihazda Karekod Oluşturma
-        window.generateReceiveQR = function() {
-            if (!peer || peer.destroyed) {
-                peer = new Peer(); 
-                
-                peer.on('open', function(id) {
-                    document.getElementById('qrcode-container').innerHTML = "";
-                    new QRCode(document.getElementById("qrcode-container"), id);
-                    document.getElementById('peer-status').style.display = 'block';
-                    document.getElementById('peer-status').innerText = 'Bağlantı bekleniyor... (Uygulamayı kapatmayın)';
-                });
-
-                // Veri geldiğinde yakala
-                peer.on('connection', function(conn) {
-                    conn.on('data', function(data) {
-                        if(confirm("Karşı cihazdan yeni veriler geldi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
-                            const tx = db.transaction("kayitlar", "readwrite");
-                            const store = tx.objectStore("kayitlar");
-                            
-                            store.clear();
-                            data.forEach(item => store.put(item));
-                            
-                            tx.oncomplete = () => { 
-                                alert("Veriler başarıyla aktarıldı!"); 
-                                loadData(); 
-                            };
-                        }
-                    });
-                });
-            } else {
-                alert("Karekod zaten oluşturuldu. Gönderici cihazdan okutabilirsiniz.");
+        function resetPeerState() {
+            document.getElementById('qrcode-container').innerHTML = "";
+            document.getElementById('peer-status').style.display = 'none';
+            if (peer) {
+                peer.destroy();
+                peer = null;
             }
+        }
+
+        window.generateReceiveQR = function() {
+            resetPeerState(); 
+            peer = new Peer(); 
+            
+            peer.on('open', function(id) {
+                new QRCode(document.getElementById("qrcode-container"), id);
+                document.getElementById('peer-status').style.display = 'block';
+                document.getElementById('peer-status').innerText = 'Bağlantı bekleniyor... (Uygulamayı kapatmayın)';
+            });
+
+            peer.on('connection', function(conn) {
+                conn.on('data', function(data) {
+                    if(confirm("Karşı cihazdan yeni veriler geldi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
+                        const tx = db.transaction("kayitlar", "readwrite");
+                        const store = tx.objectStore("kayitlar");
+                        
+                        store.clear();
+                        data.forEach(item => store.put(item));
+                        
+                        tx.oncomplete = () => { 
+                            alert("Veriler başarıyla aktarıldı!"); 
+                            loadData(); 
+                            resetPeerState(); 
+                        };
+                    } else {
+                        resetPeerState(); 
+                    }
+                });
+            });
         };
 
-        // 2. Gönderici Cihazda Kamerayı Açma
         window.startQRScanner = function() {
             document.getElementById('reader').style.display = 'block';
             const html5QrCode = new Html5Qrcode("reader");
 
             html5QrCode.start(
-                { facingMode: "environment" }, // Arka kamera
+                { facingMode: "environment" }, 
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText, decodedResult) => {
                     html5QrCode.stop();
                     document.getElementById('reader').style.display = 'none';
-                    // Okunan ID'ye veriyi gönder
                     sendDataToPeer(decodedText);
                 },
                 (errorMessage) => {
-                    // Kamera okuma yaparken burası tetiklenir (Gizli tutulabilir)
+                    // Kamera okuma devam ediyor
                 }
             ).catch((err) => {
                 alert("Kamera başlatılamadı: " + err);
             });
         };
 
-        // 3. Gönderici Cihazdan Veriyi Karşıya Fırlatma
         function sendDataToPeer(targetPeerId) {
             if (!peer || peer.destroyed) {
                 peer = new Peer();
@@ -631,10 +654,15 @@
                     conn.on('open', function() {
                         conn.send(allData);
                         alert("Veriler karşı cihaza başarıyla gönderildi!");
+                        
+                        setTimeout(() => {
+                            resetPeerState(); 
+                        }, 1000);
                     });
                     
                     conn.on('error', function(err) {
                         alert("Gönderim hatası: Bağlantı kurulamadı.");
+                        resetPeerState();
                     });
                 };
             };
@@ -650,7 +678,6 @@
     </script>
 
     <script>
-        // Service Worker Kaydı (Çevrimdışı Çalışma İçin)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
