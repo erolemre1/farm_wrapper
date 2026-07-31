@@ -42,9 +42,9 @@
         .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
         .table-img:hover { opacity: 0.8; }
         
-        .search-box { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; box-sizing: border-box; }
-        .action-buttons { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
-        .total-count { background: #0056b3; color: white; padding: 0.5rem 1rem; border-radius: 4px; font-weight: bold; display: inline-block; margin-bottom: 1rem; }
+        .search-box { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .action-buttons { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; border-bottom: 2px solid black; }
+        .total-count { background: #00ca22; color: white; padding: 0.5rem 1rem; border-radius: 4px; font-weight: bold; display: inline-block; margin-bottom: 1rem; }
         
         .table-responsive { overflow-x: auto; background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; }
@@ -189,18 +189,16 @@
             <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
             <div>
                 <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
-                    📂 Yedek Yükle (PC-Telefon Aktarımı)
+                    📂 Yedek Yükle
                     <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJSON(event)">
                 </label>
             </div>
         </div>
-
-        <div class="table-responsive">
-            <!-- Toplam Sayı -->
-            <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
+<div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
             
             <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
             
+        <div class="table-responsive">
             <table>
                 <thead>
                     <tr>
