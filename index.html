@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Çiftlik Veri Yönetimi</title>
-    
+
     <!-- Mobil İkon (PWA) Ayarları -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19,69 +20,302 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; background: #f4f4f9; }
-        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: 0.3rem; font-weight: 600; font-size: 0.9rem; }
-        input, select { width: 100%; padding: 0.6rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { padding: 0.6rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; margin-top: 0.5rem; }
-        .btn-primary { background: #0056b3; width: 100%; }
-        .btn-success { background: #28a745; }
-        .btn-warning { background: #ffc107; color: black; }
-        .btn-danger { background: #dc3545; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
-        .btn-info { background: #17a2b8; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
-        
-        .preview-container { position: relative; display: inline-block; margin-top: 5px; }
-        .preview { max-width: 80px; max-height: 80px; display: none; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
-        .preview:hover { opacity: 0.8; }
-        .remove-img-btn { position: absolute; top: -10px; right: -10px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .remove-img-btn:hover { background: #c82333; }
-        
-        .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
-        .table-img:hover { opacity: 0.8; }
-        
-        .search-box { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .action-buttons { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; border-bottom: 2px solid black; }
-        .total-count { background: #00ca22; color: white; padding: 0.5rem 1rem; border-radius: 4px; font-weight: bold; display: inline-block; margin-bottom: 1rem; }
-        
-        .table-responsive { overflow-x: auto; background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle; }
-        th { background: #f8f9fa; }
-        
-        .pagination { display: flex; gap: 5px; justify-content: center; margin-top: 15px; }
-        .page-btn { padding: 5px 12px; background: #e9ecef; color: black; border-radius: 4px; margin: 0; }
-        .page-btn.active { background: #0056b3; color: white; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1rem;
+            background: #f4f4f9;
+        }
 
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
-        .modal-content { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .close-modal { position: absolute; top: 20px; right: 35px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; user-select: none; }
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
 
-        /* Şifre Ekranı Stilleri */
-        #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; }
-        .login-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
-        .login-card h2 { margin-top: 0; color: #333; }
-        .login-card input { font-size: 1.1rem; padding: 0.8rem; text-align: center; margin-bottom: 1rem; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            margin-top: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #0056b3;
+            width: 100%;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: black;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+        }
+
+        .preview-container {
+            position: relative;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .preview {
+            max-width: 80px;
+            max-height: 80px;
+            display: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .preview:hover {
+            opacity: 0.8;
+        }
+
+        .remove-img-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 14px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+            margin: 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .remove-img-btn:hover {
+            background: #c82333;
+        }
+
+        .table-img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .table-img:hover {
+            opacity: 0.8;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            border-bottom: 2px solid black;
+        }
+
+        .total-count {
+            background: #00ca22;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            min-width: 800px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #f8f9fa;
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .page-btn {
+            padding: 5px 12px;
+            background: #e9ecef;
+            color: black;
+            border-radius: 4px;
+            margin: 0;
+        }
+
+        .page-btn.active {
+            background: #0056b3;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        #loginScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 80vh;
+        }
+
+        .login-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .login-card h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .login-card input {
+            font-size: 1.1rem;
+            padding: 0.8rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
+
 <body>
 
-    <!-- ŞİFRE EKRANI -->
     <div id="loginScreen">
         <div class="login-card">
             <h2>🔒 Çiftlik Veri Girişi</h2>
-            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">Lütfen devam etmek için şifrenizi girin.</p>
-            <input type="password" id="appPassword" placeholder="Şifrenizi Girin" onkeypress="handleEnter(event)">
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">Lütfen devam etmek için şifrenizi girin.
+            </p>
+            <input type="password" id="appPassword" placeholder="Şifrenizi Girin" onkeypress="handleEnter(event)"
+                autofocus>
             <button class="btn-primary" onclick="checkPassword()">Giriş Yap</button>
-            <p id="passwordError" style="color: #dc3545; font-size: 0.9rem; display: none; margin-top: 10px; font-weight: bold;">Hatalı Şifre!</p>
+            <p id="passwordError"
+                style="color: #dc3545; font-size: 0.9rem; display: none; margin-top: 10px; font-weight: bold;">Hatalı
+                Şifre!</p>
         </div>
     </div>
 
     <!-- ANA UYGULAMA (Başlangıçta Gizli) -->
     <div id="mainApp" style="display: none;">
-        
         <div class="card">
             <h2 id="formTitle">Yeni Hayvan Ekle</h2>
             <form id="animalForm">
@@ -107,12 +341,12 @@
                         <label>Hayvanın Cinsi (Irkı)</label>
                         <select id="hayvanCinsi" required>
                             <option value="">Seçiniz...</option>
-                                <option value="simental">Simental </option>
-                                <option value="hollanda">Hollanda </option>
-                                <option value="simental-kırma">Simental Kırma </option>
-                                <option value="hollanda-kırma">Hollanda Kırma </option>
-                                <option value="montofon">Montofon</option>
-                                <option value="boz">Boz</option>
+                            <option value="simental">Simental </option>
+                            <option value="hollanda">Hollanda </option>
+                            <option value="simental-kırma">Simental Kırma </option>
+                            <option value="hollanda-kırma">Hollanda Kırma </option>
+                            <option value="montofon">Montofon</option>
+                            <option value="boz">Boz</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -127,12 +361,12 @@
                         <label>Annesinin Cinsi (Irkı)</label>
                         <select id="anneCinsi">
                             <option value="">Seçiniz (Zorunlu Değil)</option>
-                                <option value="simental">Simental </option>
-                                <option value="hollanda">Hollanda </option>
-                                <option value="simental-kırma">Simental Kırma </option>
-                                <option value="hollanda-kırma">Hollanda Kırma </option>
-                                <option value="montofon">Montofon</option>
-                                <option value="boz">Boz</option>
+                            <option value="simental">Simental </option>
+                            <option value="hollanda">Hollanda </option>
+                            <option value="simental-kırma">Simental Kırma </option>
+                            <option value="hollanda-kırma">Hollanda Kırma </option>
+                            <option value="montofon">Montofon</option>
+                            <option value="boz">Boz</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -140,46 +374,58 @@
                         <input type="date" id="kogustuguTarih">
                     </div>
                 </div>
-                
+
                 <div class="grid">
                     <div class="form-group">
                         <label>Hayvanın Resmi</label>
                         <input type="file" id="hayvanResmi" accept="image/*">
                         <div class="preview-container">
-                            <img id="previewHayvan" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
-                            <button type="button" class="remove-img-btn" id="removeHayvanBtn" onclick="removeImage('hayvan')">&times;</button>
+                            <img id="previewHayvan" class="preview" onclick="openModal(this.src)"
+                                title="Büyütmek için tıklayın">
+                            <button type="button" class="remove-img-btn" id="removeHayvanBtn"
+                                onclick="removeImage('hayvan')">&times;</button>
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Anne Resmi</label>
                         <input type="file" id="anneResmi" accept="image/*">
                         <div class="preview-container">
-                            <img id="previewAnne" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
-                            <button type="button" class="remove-img-btn" id="removeAnneBtn" onclick="removeImage('anne')">&times;</button>
+                            <img id="previewAnne" class="preview" onclick="openModal(this.src)"
+                                title="Büyütmek için tıklayın">
+                            <button type="button" class="remove-img-btn" id="removeAnneBtn"
+                                onclick="removeImage('anne')">&times;</button>
                         </div>
                     </div>
                 </div>
 
                 <button type="submit" class="btn-primary" id="submitBtn">Kaydet</button>
-                <button type="button" class="btn-warning" id="cancelEditBtn" style="display:none; width: 100%; margin-top:5px;" onclick="cancelEdit()">İptal Et</button>
+                <button type="button" class="btn-warning" id="cancelEditBtn"
+                    style="display:none; width: 100%; margin-top:5px;" onclick="cancelEdit()">İptal Et</button>
             </form>
         </div>
 
         <div class="card" id="syncCard">
             <h2 style="margin-top: 0;">🔄 Cihazlar Arası Hızlı Aktarım (Karekod)</h2>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Uygulamayı bir cihazda alıcı, diğer cihazda gönderici olarak ayarlayarak verilerinizi saniyeler içinde senkronize edebilirsiniz.</p>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Uygulamayı bir cihazda alıcı, diğer cihazda
+                gönderici olarak ayarlayarak verilerinizi saniyeler içinde senkronize edebilirsiniz.</p>
             <div class="grid">
-                <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                <div
+                    style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
                     <h3 style="margin-top: 0;">💻 Alıcı Cihaz (Örn: Bilgisayar)</h3>
                     <p style="font-size: 0.85rem;">Verileri bu cihaza almak için bağlantı karekodu oluşturun.</p>
-                    <button class="btn-info" id="btnReceiveQR" style="width: 100%;" onclick="toggleReceiveQR()">Alıcı Karekodu Oluştur</button>
+                    <button class="btn-info" id="btnReceiveQR" style="width: 100%;" onclick="toggleReceiveQR()">Alıcı
+                        Karekodu Oluştur</button>
                     <div id="qrcode-container" style="display: flex; justify-content: center; margin-top: 15px;"></div>
-                    <p id="peer-status" style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">Bağlantı bekleniyor...</p>
+                    <p id="peer-status"
+                        style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">
+                        Bağlantı bekleniyor...</p>
                 </div>
-                <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                <div
+                    style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
                     <h3 style="margin-top: 0;">📱 Gönderici Cihaz (Örn: Telefon)</h3>
                     <p style="font-size: 0.85rem;">Bu cihazdaki verileri alıcıya göndermek için karekodu okutun.</p>
-                    <button class="btn-primary" id="btnScanQR" style="background: #6f42c1; width: 100%;" onclick="toggleQRScanner()">Kamerayı Aç ve Okut</button>
+                    <button class="btn-primary" id="btnScanQR" style="background: #6f42c1; width: 100%;"
+                        onclick="toggleQRScanner()">Kamerayı Aç ve Okut</button>
                     <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
                 </div>
             </div>
@@ -188,18 +434,21 @@
         <div class="action-buttons">
             <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
             <div>
-                <label style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
+                <label
+                    style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
                     📂 Yedek Yükle
-                    <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJSON(event)">
+                    <input type="file" id="importJson" accept=".json" style="display: none;"
+                        onchange="importJSON(event)">
                 </label>
             </div>
         </div>
 
-            <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
-            
-            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
+        <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
+
+        <input type="text" id="searchInput" class="search-box"
+            placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
         <div class="table-responsive">
-            
+
             <table>
                 <thead>
                     <tr>
@@ -218,10 +467,11 @@
                 </thead>
                 <tbody id="tableBody"></tbody>
             </table>
-            
+
             <div id="pagination" class="pagination"></div>
         </div>
-    </div> <!-- Main App Kapanış -->
+    </div>
+    <!-- Main App Kapanış -->
 
     <!-- Resim Büyütme Modalı -->
     <div id="imageModal" class="modal" onclick="closeModal()">
@@ -230,7 +480,7 @@
     </div>
 
     <script>
-                const hashed_data = "96a8f45187e9360673b36d3b6fa2dedccae4a05522241b80e8632a41ef4d1be2"; 
+        const hashed_data = "96a8f45187e9360673b36d3b6fa2dedccae4a05522241b80e8632a41ef4d1be2";
 
         if (sessionStorage.getItem("loggedIn") === "true") {
             showApp();
@@ -238,15 +488,15 @@
 
         async function checkPassword() {
             const input = document.getElementById('appPassword').value;
-            if(!input) return;
+            if (!input) return;
 
             const encoder = new TextEncoder();
             const data = encoder.encode(input);
             const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            
+
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            
+
 
             if (hashHex === hashed_data) {
                 sessionStorage.setItem("loggedIn", "true");
@@ -263,7 +513,7 @@
         }
 
         function handleEnter(e) {
-            if(e.key === 'Enter') {
+            if (e.key === 'Enter') {
                 checkPassword();
             }
         }
@@ -273,11 +523,11 @@
         let db;
         let base64Hayvan = "";
         let base64Anne = "";
-        
+
         let allData = [];
         let filteredData = [];
         let currentPage = 1;
-        const rowsPerPage = 5; 
+        const rowsPerPage = 5;
 
         const request = indexedDB.open("CiftlikPro", 1);
         request.onupgradeneeded = (e) => {
@@ -292,7 +542,7 @@
         };
 
         function handleImageUpload(inputId, previewId, isAnne) {
-            document.getElementById(inputId).addEventListener('change', function(e) {
+            document.getElementById(inputId).addEventListener('change', function (e) {
                 const file = e.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
@@ -304,7 +554,7 @@
                         base64Hayvan = reader.result;
                         document.getElementById('removeHayvanBtn').style.display = 'flex';
                     }
-                    
+
                     const imgObj = document.getElementById(previewId);
                     imgObj.src = reader.result;
                     imgObj.style.display = 'block';
@@ -315,16 +565,16 @@
         handleImageUpload('hayvanResmi', 'previewHayvan', false);
         handleImageUpload('anneResmi', 'previewAnne', true);
 
-        window.removeImage = function(type) {
+        window.removeImage = function (type) {
             if (type === 'hayvan') {
                 base64Hayvan = "";
-                document.getElementById('hayvanResmi').value = ""; 
+                document.getElementById('hayvanResmi').value = "";
                 document.getElementById('previewHayvan').style.display = 'none';
                 document.getElementById('removeHayvanBtn').style.display = 'none';
                 document.getElementById('previewHayvan').src = "";
             } else if (type === 'anne') {
                 base64Anne = "";
-                document.getElementById('anneResmi').value = ""; 
+                document.getElementById('anneResmi').value = "";
                 document.getElementById('previewAnne').style.display = 'none';
                 document.getElementById('removeAnneBtn').style.display = 'none';
                 document.getElementById('previewAnne').src = "";
@@ -333,7 +583,7 @@
 
         document.getElementById('animalForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            
+
             const data = {
                 kupeNo: document.getElementById('kupeNo').value,
                 hayvanLakabi: document.getElementById('hayvanLakabi').value,
@@ -348,16 +598,16 @@
             };
 
             const editId = document.getElementById('editId').value;
-            if (editId) data.id = Number(editId); 
+            if (editId) data.id = Number(editId);
 
             const tx = db.transaction("kayitlar", "readwrite");
             const store = tx.objectStore("kayitlar");
-            
-            if (editId) store.put(data); 
-            else store.add(data); 
+
+            if (editId) store.put(data);
+            else store.add(data);
 
             tx.oncomplete = () => {
-                cancelEdit(); 
+                cancelEdit();
                 loadData();
             };
         });
@@ -367,23 +617,23 @@
             const request = tx.objectStore("kayitlar").getAll();
 
             request.onsuccess = () => {
-                allData = request.result.sort((a, b) => a.id - b.id); 
+                allData = request.result.sort((a, b) => a.id - b.id);
                 document.getElementById('totalCount').innerText = "Toplam Hayvan Sayısı: " + allData.length;
                 applyFilter();
             };
         }
 
-        window.applyFilter = function() {
+        window.applyFilter = function () {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
+
             filteredData = allData.filter(row => {
                 const kupe = (row.kupeNo || "").toLowerCase();
                 const cins = (row.hayvanCinsi || "").toLowerCase();
                 const lakap = (row.hayvanLakabi || "").toLowerCase();
                 return kupe.includes(searchTerm) || cins.includes(searchTerm) || lakap.includes(searchTerm);
             });
-            
-            currentPage = 1; 
+
+            currentPage = 1;
             renderTable();
             renderPagination();
         };
@@ -391,7 +641,7 @@
         function renderTable() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
-            
+
             if (filteredData.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -400,9 +650,9 @@
                         </td>
                     </tr>
                 `;
-                return; 
+                return;
             }
-    
+
             const startIndex = (currentPage - 1) * rowsPerPage;
             const endIndex = startIndex + rowsPerPage;
             const pageData = filteredData.slice(startIndex, endIndex);
@@ -435,10 +685,10 @@
         function renderPagination() {
             const paginationDiv = document.getElementById('pagination');
             paginationDiv.innerHTML = "";
-            
+
             const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-            
-            if (totalPages <= 1) return; 
+
+            if (totalPages <= 1) return;
 
             for (let i = 1; i <= totalPages; i++) {
                 const btn = document.createElement('button');
@@ -453,11 +703,11 @@
             }
         }
 
-        window.startEdit = function(row) {
+        window.startEdit = function (row) {
             document.getElementById('formTitle').innerText = "Kayıt Düzenle";
             document.getElementById('submitBtn').innerText = "Güncelle";
             document.getElementById('cancelEditBtn').style.display = "block";
-            
+
             document.getElementById('editId').value = row.id;
             document.getElementById('kupeNo').value = row.kupeNo;
             document.getElementById('hayvanLakabi').value = row.hayvanLakabi || "";
@@ -474,52 +724,52 @@
             const prevHayvan = document.getElementById('previewHayvan');
             const prevAnne = document.getElementById('previewAnne');
 
-            if(base64Hayvan) { 
-                prevHayvan.src = base64Hayvan; 
-                prevHayvan.style.display = 'block'; 
+            if (base64Hayvan) {
+                prevHayvan.src = base64Hayvan;
+                prevHayvan.style.display = 'block';
                 document.getElementById('removeHayvanBtn').style.display = 'flex';
-            } else { 
-                prevHayvan.style.display = 'none'; 
+            } else {
+                prevHayvan.style.display = 'none';
                 document.getElementById('removeHayvanBtn').style.display = 'none';
             }
-            
-            if(base64Anne) { 
-                prevAnne.src = base64Anne; 
-                prevAnne.style.display = 'block'; 
+
+            if (base64Anne) {
+                prevAnne.src = base64Anne;
+                prevAnne.style.display = 'block';
                 document.getElementById('removeAnneBtn').style.display = 'flex';
-            } else { 
-                prevAnne.style.display = 'none'; 
+            } else {
+                prevAnne.style.display = 'none';
                 document.getElementById('removeAnneBtn').style.display = 'none';
             }
-            
-            window.scrollTo(0, 0); 
+
+            window.scrollTo(0, 0);
         };
 
-        window.cancelEdit = function() {
+        window.cancelEdit = function () {
             document.getElementById('animalForm').reset();
             document.getElementById('editId').value = "";
             document.getElementById('formTitle').innerText = "Yeni Hayvan Ekle";
             document.getElementById('submitBtn').innerText = "Kaydet";
             document.getElementById('cancelEditBtn').style.display = "none";
-            
+
             document.getElementById('previewHayvan').style.display = 'none';
             document.getElementById('previewAnne').style.display = 'none';
             document.getElementById('removeHayvanBtn').style.display = 'none';
             document.getElementById('removeAnneBtn').style.display = 'none';
-            
+
             base64Hayvan = "";
             base64Anne = "";
         };
 
-        window.deleteData = function(id) {
-            if(confirm("Bu kaydı silmek istediğinize emin misiniz?")) {
+        window.deleteData = function (id) {
+            if (confirm("Bu kaydı silmek istediğinize emin misiniz?")) {
                 const tx = db.transaction("kayitlar", "readwrite");
                 tx.objectStore("kayitlar").delete(id);
                 tx.oncomplete = () => loadData();
             }
         };
 
-        window.openModal = function(src) {
+        window.openModal = function (src) {
             if (!src || src.endsWith('null') || src === "") return;
             const modal = document.getElementById("imageModal");
             const modalImg = document.getElementById("expandedImg");
@@ -527,11 +777,11 @@
             modalImg.src = src;
         };
 
-        window.closeModal = function() {
+        window.closeModal = function () {
             document.getElementById("imageModal").style.display = "none";
         };
 
-        window.exportJSON = function() {
+        window.exportJSON = function () {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
             const today = new Date().toISOString().split('T')[0];
             const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
@@ -543,31 +793,31 @@
             downloadAnchorNode.remove();
         };
 
-        window.importJSON = function(event) {
+        window.importJSON = function (event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            if(!confirm("DİKKAT: Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK ve sadece yedekteki veriler yüklenecektir. Onaylıyor musunuz?")) {
-                event.target.value = ''; 
+            if (!confirm("DİKKAT: Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK ve sadece yedekteki veriler yüklenecektir. Onaylıyor musunuz?")) {
+                event.target.value = '';
                 return;
             }
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const data = JSON.parse(e.target.result);
                     const tx = db.transaction("kayitlar", "readwrite");
                     const store = tx.objectStore("kayitlar");
-                    
+
                     store.clear();
                     data.forEach(item => store.put(item));
-                    
-                    tx.oncomplete = () => { 
-                        alert("Yedek başarıyla yüklendi ve eski veriler temizlendi!"); 
-                        loadData(); 
+
+                    tx.oncomplete = () => {
+                        alert("Yedek başarıyla yüklendi ve eski veriler temizlendi!");
+                        loadData();
                     };
-                } catch (err) { 
-                    alert("Geçersiz yedek dosyası!"); 
+                } catch (err) {
+                    alert("Geçersiz yedek dosyası!");
                 }
             };
             reader.readAsText(file);
@@ -587,7 +837,7 @@
                 peer = null;
             }
             const btn = document.getElementById('btnReceiveQR');
-            if(btn) {
+            if (btn) {
                 btn.innerText = "Alıcı Karekodu Oluştur";
                 btn.style.background = "";
             }
@@ -612,57 +862,57 @@
         function hideScannerUI() {
             document.getElementById('reader').style.display = 'none';
             const btn = document.getElementById('btnScanQR');
-            if(btn) {
+            if (btn) {
                 btn.innerText = "Kamerayı Aç ve Okut";
-                btn.style.background = "#6f42c1"; 
+                btn.style.background = "#6f42c1";
             }
         }
 
-        window.toggleReceiveQR = function() {
+        window.toggleReceiveQR = function () {
             const btn = document.getElementById('btnReceiveQR');
-            
+
             if (btn.innerText === "Kapat") {
                 resetPeerState();
                 return;
             }
-            
-            resetPeerState(); 
-            peer = new Peer(); 
-            
-            peer.on('open', function(id) {
+
+            resetPeerState();
+            peer = new Peer();
+
+            peer.on('open', function (id) {
                 new QRCode(document.getElementById("qrcode-container"), id);
                 document.getElementById('peer-status').style.display = 'block';
                 document.getElementById('peer-status').innerText = 'Bağlantı bekleniyor... (Uygulamayı kapatmayın)';
-                
+
                 btn.innerText = "Kapat";
-                btn.style.background = "#dc3545"; 
+                btn.style.background = "#dc3545";
             });
 
-            peer.on('connection', function(conn) {
-                conn.on('data', function(data) {
-                    if(confirm("Karşı cihazdan yeni veriler geldi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
+            peer.on('connection', function (conn) {
+                conn.on('data', function (data) {
+                    if (confirm("Karşı cihazdan yeni veriler geldi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
                         const tx = db.transaction("kayitlar", "readwrite");
                         const store = tx.objectStore("kayitlar");
-                        
+
                         store.clear();
                         data.forEach(item => store.put(item));
-                        
-                        tx.oncomplete = () => { 
-                            alert("Veriler başarıyla aktarıldı!"); 
-                            loadData(); 
-                            resetPeerState(); 
+
+                        tx.oncomplete = () => {
+                            alert("Veriler başarıyla aktarıldı!");
+                            loadData();
+                            resetPeerState();
                         };
                     } else {
-                        resetPeerState(); 
+                        resetPeerState();
                     }
                 });
             });
         };
 
         // 2. Gönderici Cihazda Kamerayı Açma (Aç/Kapat Mantığı)
-        window.toggleQRScanner = function() {
+        window.toggleQRScanner = function () {
             const btn = document.getElementById('btnScanQR');
-            
+
             // Eğer kamera zaten açıksa, kapat
             if (btn.innerText === "Kapat" || isScanning) {
                 resetScannerState();
@@ -671,13 +921,13 @@
 
             // Açık değilse kamerayı başlat
             document.getElementById('reader').style.display = 'block';
-            
+
             if (!html5QrCode) {
                 html5QrCode = new Html5Qrcode("reader");
             }
 
             html5QrCode.start(
-                { facingMode: "environment" }, 
+                { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText, decodedResult) => {
                     // Okuma başarılı olunca kamerayı kapat ve veriyi gönder
@@ -711,11 +961,11 @@
                 request.onsuccess = () => {
                     const allData = request.result;
                     const conn = peer.connect(targetPeerId);
-                    
-                    conn.on('open', function() {
+
+                    conn.on('open', function () {
                         conn.send(allData);
                         alert("Veriler karşı cihaza başarıyla gönderildi!");
-                        
+
                         setTimeout(() => {
                             if (peer) {
                                 peer.destroy();
@@ -723,8 +973,8 @@
                             }
                         }, 1000);
                     });
-                    
-                    conn.on('error', function(err) {
+
+                    conn.on('error', function (err) {
                         alert("Gönderim hatası: Bağlantı kurulamadı.");
                         if (peer) {
                             peer.destroy();
@@ -754,4 +1004,5 @@
         }
     </script>
 </body>
+
 </html>
