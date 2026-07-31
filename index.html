@@ -172,14 +172,14 @@
                 <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
                     <h3 style="margin-top: 0;">💻 Alıcı Cihaz (Örn: Bilgisayar)</h3>
                     <p style="font-size: 0.85rem;">Verileri bu cihaza almak için bağlantı karekodu oluşturun.</p>
-                    <button class="btn-info" style="width: 100%;" onclick="generateReceiveQR()">Alıcı Karekodu Oluştur</button>
+                    <button class="btn-info" id="btnReceiveQR" style="width: 100%;" onclick="toggleReceiveQR()">Alıcı Karekodu Oluştur</button>
                     <div id="qrcode-container" style="display: flex; justify-content: center; margin-top: 15px;"></div>
                     <p id="peer-status" style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">Bağlantı bekleniyor...</p>
                 </div>
                 <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
                     <h3 style="margin-top: 0;">📱 Gönderici Cihaz (Örn: Telefon)</h3>
                     <p style="font-size: 0.85rem;">Bu cihazdaki verileri alıcıya göndermek için karekodu okutun.</p>
-                    <button class="btn-primary" style="background: #6f42c1; width: 100%;" onclick="startQRScanner()">Kamerayı Aç ve Okut</button>
+                    <button class="btn-primary" id="btnScanQR" style="background: #6f42c1; width: 100%;" onclick="toggleQRScanner()">Kamerayı Aç ve Okut</button>
                     <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
                 </div>
             </div>
@@ -194,11 +194,12 @@
                 </label>
             </div>
         </div>
-<div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
+
+            <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
             
             <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
-            
         <div class="table-responsive">
+            
             <table>
                 <thead>
                     <tr>
@@ -229,7 +230,7 @@
     </div>
 
     <script>
-        const hashed_data = "96a8f45187e9360673b36d3b6fa2dedccae4a05522241b80e8632a41ef4d1be2"; 
+                const hashed_data = "96a8f45187e9360673b36d3b6fa2dedccae4a05522241b80e8632a41ef4d1be2"; 
 
         if (sessionStorage.getItem("loggedIn") === "true") {
             showApp();
@@ -237,7 +238,6 @@
 
         async function checkPassword() {
             const input = document.getElementById('appPassword').value;
-            
             if(!input) return;
 
             const encoder = new TextEncoder();
@@ -530,6 +530,7 @@
         window.closeModal = function() {
             document.getElementById("imageModal").style.display = "none";
         };
+
         window.exportJSON = function() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
             const today = new Date().toISOString().split('T')[0];
@@ -575,6 +576,8 @@
 
     <script>
         let peer = null;
+        let html5QrCode = null;
+        let isScanning = false;
 
         function resetPeerState() {
             document.getElementById('qrcode-container').innerHTML = "";
@@ -583,9 +586,46 @@
                 peer.destroy();
                 peer = null;
             }
+            const btn = document.getElementById('btnReceiveQR');
+            if(btn) {
+                btn.innerText = "Alıcı Karekodu Oluştur";
+                btn.style.background = "";
+            }
         }
 
-        window.generateReceiveQR = function() {
+        function resetScannerState() {
+            if (isScanning && html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    isScanning = false;
+                    html5QrCode.clear();
+                    hideScannerUI();
+                }).catch(err => {
+                    console.log("Kamera durdurulurken hata: ", err);
+                    isScanning = false;
+                    hideScannerUI();
+                });
+            } else {
+                hideScannerUI();
+            }
+        }
+
+        function hideScannerUI() {
+            document.getElementById('reader').style.display = 'none';
+            const btn = document.getElementById('btnScanQR');
+            if(btn) {
+                btn.innerText = "Kamerayı Aç ve Okut";
+                btn.style.background = "#6f42c1"; 
+            }
+        }
+
+        window.toggleReceiveQR = function() {
+            const btn = document.getElementById('btnReceiveQR');
+            
+            if (btn.innerText === "Kapat") {
+                resetPeerState();
+                return;
+            }
+            
             resetPeerState(); 
             peer = new Peer(); 
             
@@ -593,6 +633,9 @@
                 new QRCode(document.getElementById("qrcode-container"), id);
                 document.getElementById('peer-status').style.display = 'block';
                 document.getElementById('peer-status').innerText = 'Bağlantı bekleniyor... (Uygulamayı kapatmayın)';
+                
+                btn.innerText = "Kapat";
+                btn.style.background = "#dc3545"; 
             });
 
             peer.on('connection', function(conn) {
@@ -616,26 +659,46 @@
             });
         };
 
-        window.startQRScanner = function() {
+        // 2. Gönderici Cihazda Kamerayı Açma (Aç/Kapat Mantığı)
+        window.toggleQRScanner = function() {
+            const btn = document.getElementById('btnScanQR');
+            
+            // Eğer kamera zaten açıksa, kapat
+            if (btn.innerText === "Kapat" || isScanning) {
+                resetScannerState();
+                return;
+            }
+
+            // Açık değilse kamerayı başlat
             document.getElementById('reader').style.display = 'block';
-            const html5QrCode = new Html5Qrcode("reader");
+            
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("reader");
+            }
 
             html5QrCode.start(
                 { facingMode: "environment" }, 
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText, decodedResult) => {
-                    html5QrCode.stop();
-                    document.getElementById('reader').style.display = 'none';
+                    // Okuma başarılı olunca kamerayı kapat ve veriyi gönder
+                    resetScannerState();
                     sendDataToPeer(decodedText);
                 },
                 (errorMessage) => {
                     // Kamera okuma devam ediyor
                 }
-            ).catch((err) => {
+            ).then(() => {
+                isScanning = true;
+                // Kamera başarıyla açıldı, butonu Kapat'a çevir
+                btn.innerText = "Kapat";
+                btn.style.background = "#dc3545"; // Kırmızı renk
+            }).catch((err) => {
                 alert("Kamera başlatılamadı: " + err);
+                resetScannerState();
             });
         };
 
+        // 3. Gönderici Cihazdan Veriyi Karşıya Fırlatma
         function sendDataToPeer(targetPeerId) {
             if (!peer || peer.destroyed) {
                 peer = new Peer();
@@ -654,13 +717,19 @@
                         alert("Veriler karşı cihaza başarıyla gönderildi!");
                         
                         setTimeout(() => {
-                            resetPeerState(); 
+                            if (peer) {
+                                peer.destroy();
+                                peer = null;
+                            }
                         }, 1000);
                     });
                     
                     conn.on('error', function(err) {
                         alert("Gönderim hatası: Bağlantı kurulamadı.");
-                        resetPeerState();
+                        if (peer) {
+                            peer.destroy();
+                            peer = null;
+                        }
                     });
                 };
             };
