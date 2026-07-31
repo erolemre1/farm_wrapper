@@ -1005,14 +1005,14 @@
     </script>
 
     <script>
-        window.addEventListener('DOMContentLoaded', (event) => {
-    setTimeout(() => {
-        const passwordInput = document.getElementById('appPassword');
-        if(passwordInput) {
-            passwordInput.focus();
-            passwordInput.click(); 
-        }
-    }, 500);
+document.addEventListener('click', function(event) {
+    const passwordInput = document.getElementById('appPassword');
+    const loginScreen = document.getElementById('loginScreen');
+    
+    // Sadece şifre ekranı görünürken ve zaten input/butona tıklanmadıysa çalışsın
+    if (loginScreen.style.display !== 'none' && event.target !== passwordInput && event.target.tagName !== 'BUTTON') {
+        passwordInput.focus();
+    }
 });
     </script>
 </body>
