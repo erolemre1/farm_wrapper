@@ -1,4 +1,4 @@
-const CACHE_NAME = `ciftlik-pro-v${Date.now()}`; 
+const CACHE_NAME = 'ciftlik-pro-v1';
 
 
 const ASSETS = [

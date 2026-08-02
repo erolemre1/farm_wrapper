@@ -5,7 +5,8 @@ const swPath = './sw.js';
 
 try {
     // 1. sw.js dosyasını oku
-    let content = fs.readFileSync(swPath, 'utf8');
+    // Artık tırnak tipine bakmaksızın o satırı tamamen ezecek
+let content = content.replace(/const CACHE_NAME = .*/, `const CACHE_NAME = '${newVersion}';`);
     
     // 2. Zaman damgasını oluştur
     const newVersion = `ciftlik-pro-v${Date.now()}`;
