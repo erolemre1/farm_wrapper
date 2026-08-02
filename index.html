@@ -571,28 +571,62 @@
             db = e.target.result;
             loadData();
         };
+// YENİ KAYITLAR İÇİN: Fotoğrafı yüklenirken anında sıkıştıran fonksiyon
+function handleImageUpload(inputId, previewId, isAnne) {
+    document.getElementById(inputId).addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
 
-        function handleImageUpload(inputId, previewId, isAnne) {
-            document.getElementById(inputId).addEventListener('change', function (e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    if (isAnne) {
-                        base64Anne = reader.result;
-                        document.getElementById('removeAnneBtn').style.display = 'flex';
-                    } else {
-                        base64Hayvan = reader.result;
-                        document.getElementById('removeHayvanBtn').style.display = 'flex';
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const img = new Image();
+            img.onload = function () {
+                
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800; 
+                const MAX_HEIGHT = 800; 
+                let width = img.width;
+                let height = img.height;
+
+                // En-boy oranını koruyarak yeniden boyutlandır
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
                     }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
 
-                    const imgObj = document.getElementById(previewId);
-                    imgObj.src = reader.result;
-                    imgObj.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            });
-        }
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // %70 kalite ile JPEG formatında hafiflet
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+                if (isAnne) {
+                    base64Anne = compressedBase64;
+                    document.getElementById('removeAnneBtn').style.display = 'flex';
+                } else {
+                    base64Hayvan = compressedBase64;
+                    document.getElementById('removeHayvanBtn').style.display = 'flex';
+                }
+
+                const imgObj = document.getElementById(previewId);
+                imgObj.src = compressedBase64;
+                imgObj.style.display = 'block';
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file); 
+    });
+}
         handleImageUpload('hayvanResmi', 'previewHayvan', false);
         handleImageUpload('anneResmi', 'previewAnne', true);
 
