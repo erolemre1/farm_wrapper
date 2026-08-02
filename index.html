@@ -1146,21 +1146,22 @@ document.addEventListener('click', function(event) {
 
     <script>
         // Eski devasa fotoğrafları bulup tarayıcıda küçülten script
+// Eski devasa fotoğrafları bulup tarayıcıda küçülten script (Hata Düzeltmeli Versiyon)
 window.optimizeDatabase = async function() {
     if(!confirm("Bu işlem, veritabanındaki eski ve çok büyük boyutlu fotoğrafları tarayıp kalitesini bozmadan sıkıştıracaktır. İşlem telefonun hızına göre 1-2 dakika sürebilir. Başlamak istiyor musunuz?")) return;
 
     showLoading("Veritabanı taranıyor, lütfen bekleyin...");
     
-    // Veritabanını yazma modunda aç
-    const tx = db.transaction("kayitlar", "readwrite");
-    const store = tx.objectStore("kayitlar");
-    const request = store.getAll();
+    // 1. ADIM: Sadece Okuma (Readonly) modunda verileri çek ve işlemi hemen kapat
+    const txRead = db.transaction("kayitlar", "readonly");
+    const storeRead = txRead.objectStore("kayitlar");
+    const request = storeRead.getAll();
 
     request.onsuccess = async () => {
         const records = request.result;
-        let updatedCount = 0;
+        let updatedRecords = []; // Değişen kayıtları hafızada tutacağımız dizi
 
-        // Tüm kayıtları tek tek dön
+        // 2. ADIM: Veritabanı bağlantısından bağımsız olarak hafızada sıkıştırma yap
         for (let i = 0; i < records.length; i++) {
             let row = records[i];
             let changed = false;
@@ -1177,19 +1178,42 @@ window.optimizeDatabase = async function() {
                 changed = true;
             }
 
-            // Sıkıştırma yapıldıysa kaydı güncelle
+            // Sıkıştırma yapıldıysa bu kaydı güncellenecekler listesine ekle
             if (changed) {
-                store.put(row);
-                updatedCount++;
+                updatedRecords.push(row);
             }
         }
 
-        hideLoading();
-        alert(`Optimizasyon tamamlandı! Toplam ${updatedCount} adet ağır kayıt başarıyla küçültüldü. Artık karekod aktarımı sorunsuz çalışacaktır.`);
-        loadData();
+        // 3. ADIM: Sıkıştırılmış veriler varsa YENİ BİR YAZMA İŞLEMİ (Readwrite) başlat
+        if (updatedRecords.length > 0) {
+            showLoading("Sıkıştırılan veriler veritabanına yazılıyor...");
+            
+            const txWrite = db.transaction("kayitlar", "readwrite");
+            const storeWrite = txWrite.objectStore("kayitlar");
+
+            // Hafızadaki hazır verileri bekleme yapmadan (senkron) veritabanına bas
+            updatedRecords.forEach(record => {
+                storeWrite.put(record);
+            });
+
+            txWrite.oncomplete = () => {
+                hideLoading();
+                alert(`Optimizasyon tamamlandı! Toplam ${updatedRecords.length} adet ağır kayıt başarıyla küçültüldü. Artık karekod aktarımı sorunsuz çalışacaktır.`);
+                loadData();
+            };
+
+            txWrite.onerror = () => {
+                hideLoading();
+                alert("Veriler yazılırken bir hata oluştu.");
+            };
+
+        } else {
+            // Eğer hiçbir fotoğraf büyük değilse (zaten optimize edilmişse)
+            hideLoading();
+            alert("Harika! Veritabanında sıkıştırılması gereken ağır bir fotoğraf bulunamadı.");
+        }
     };
 };
-
 // Base64 metnini alıp Canvas ile sıkıştıran yardımcı fonksiyon
 function compressExistingBase64(base64Str) {
     return new Promise((resolve) => {
