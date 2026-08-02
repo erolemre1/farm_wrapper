@@ -30,181 +30,203 @@
     <div id="loginScreen">
         <div class="login-card">
             <h2>🔒 Çiftlik Veri Girişi</h2>
-            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">Lütfen devam etmek için şifrenizi girin.
-            </p>
-            <input type="password" id="appPassword" placeholder="Şifrenizi Girin" onkeypress="handleEnter(event)"
-                autofocus>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">Lütfen devam etmek için şifrenizi girin.</p>
+            <input type="password" id="appPassword" placeholder="Şifrenizi Girin" onkeypress="handleEnter(event)" autofocus>
             <button class="btn-primary" onclick="checkPassword()">Giriş Yap</button>
-            <p id="passwordError"
-                style="color: #dc3545; font-size: 0.9rem; display: none; margin-top: 10px; font-weight: bold;">Hatalı
-                Şifre!</p>
+            <p id="passwordError" style="color: #dc3545; font-size: 0.9rem; display: none; margin-top: 10px; font-weight: bold;">Hatalı Şifre!</p>
         </div>
     </div>
 
-    <div id="mainApp" style="display: none;">
-        <div class="card">
-            <h2 id="formTitle">Yeni Hayvan Ekle</h2>
-            <form id="animalForm">
-                <input type="hidden" id="editId">
-                <div class="grid">
-                    <div class="form-group">
-                        <label>Küpe Numarası</label>
-                        <input type="text" id="kupeNo" inputmode="numeric" pattern="[0-9]*" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Hayvan Lakabı</label>
-                        <input type="text" id="hayvanLakabi">
-                    </div>
-                    <div class="form-group">
-                        <label>Cinsiyeti</label>
-                        <select id="cinsiyet" required>
-                            <option value="">Seçiniz...</option>
-                            <option value="Erkek">Erkek</option>
-                            <option value="Dişi">Dişi</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Hayvanın Cinsi (Irkı)</label>
-                        <select id="hayvanCinsi" required>
-                            <option value="">Seçiniz...</option>
-                            <option value="simental">Simental </option>
-                            <option value="hollanda">Hollanda </option>
-                            <option value="simental-kırma">Simental Kırma </option>
-                            <option value="hollanda-kırma">Hollanda Kırma </option>
-                            <option value="montofon">Montofon</option>
-                            <option value="boz">Boz</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Doğum Tarihi</label>
-                        <input type="date" id="dogumTarihi" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Anne Küpe Numarası</label>
-                        <input type="text" id="anneKupeNo" inputmode="numeric" pattern="[0-9]*">
-                    </div>
-                    <div class="form-group">
-                        <label>Annesinin Cinsi (Irkı)</label>
-                        <select id="anneCinsi">
-                            <option value="">Seçiniz (Zorunlu Değil)</option>
-                            <option value="simental">Simental </option>
-                            <option value="hollanda">Hollanda </option>
-                            <option value="simental-kırma">Simental Kırma </option>
-                            <option value="hollanda-kırma">Hollanda Kırma </option>
-                            <option value="montofon">Montofon</option>
-                            <option value="boz">Boz</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Koğuştuğu Tarih</label>
-                        <input type="date" id="kogustuguTarih">
-                    </div>
+    <!-- Uygulama İçeriği (Giriş yapıldıktan sonra görünür) -->
+    <div id="mainApp" style="display: none; padding-bottom: 80px;">
+        
+        <!-- 1. BÖLÜM: ANA SAYFA DÜĞMELERİ (DASHBOARD) -->
+        <div id="homeView" class="view-section">
+            <h2 style="text-align: center; color: #333; margin-bottom: 20px;">🐄 Çiftlik Yönetim Paneli</h2>
+            <div class="dashboard-grid">
+                <div class="dash-card" onclick="switchView('addView')">
+                    <div class="dash-icon">➕</div>
+                    <h3>Yeni Hayvan Ekle</h3>
+                    <p>Sürüye yeni bir kayıt açın</p>
                 </div>
-
-                <div class="grid">
-                    <div class="form-group">
-                        <label>Hayvanın Resmi</label>
-                        <input type="file" id="hayvanResmi" accept="image/*">
-                        <div class="preview-container">
-                            <img id="previewHayvan" class="preview" onclick="openModal(this.src)"
-                                title="Büyütmek için tıklayın">
-                            <button type="button" class="remove-img-btn" id="removeHayvanBtn"
-                                onclick="removeImage('hayvan')">&times;</button>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Anne Resmi</label>
-                        <input type="file" id="anneResmi" accept="image/*">
-                        <div class="preview-container">
-                            <img id="previewAnne" class="preview" onclick="openModal(this.src)"
-                                title="Büyütmek için tıklayın">
-                            <button type="button" class="remove-img-btn" id="removeAnneBtn"
-                                onclick="removeImage('anne')">&times;</button>
-                        </div>
-                    </div>
+                <div class="dash-card" onclick="switchView('listView')">
+                    <div class="dash-icon">📋</div>
+                    <h3>Hayvan Listesi</h3>
+                    <p>Kayıtları incele, ara ve düzenle</p>
                 </div>
-
-                <button type="submit" class="btn-primary" id="submitBtn">Kaydet</button>
-                <button type="button" class="btn-warning" id="cancelEditBtn"
-                    style="display:none; width: 100%; margin-top:5px;" onclick="cancelEdit()">İptal Et</button>
-            </form>
-        </div>
-
-        <div class="card" id="syncCard">
-            <h2 style="margin-top: 0;">🔄 Cihazlar Arası Hızlı Aktarım (Karekod)</h2>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Uygulamayı bir cihazda alıcı, diğer cihazda
-                gönderici olarak ayarlayarak verilerinizi saniyeler içinde senkronize edebilirsiniz.</p>
-            <div class="grid">
-                <div
-                    style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
-                    <h3 style="margin-top: 0;">💻 Alıcı Cihaz (Örn: Bilgisayar)</h3>
-                    <p style="font-size: 0.85rem;">Verileri bu cihaza almak için bağlantı karekodu oluşturun.</p>
-                    <button class="btn-info" id="btnReceiveQR" style="width: 100%;" onclick="toggleReceiveQR()">Alıcı
-                        Karekodu Oluştur</button>
-                    <div id="qrcode-container" style="display: flex; justify-content: center; margin-top: 15px;"></div>
-                    <p id="peer-status"
-                        style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">
-                        Bağlantı bekleniyor...</p>
-                </div>
-                <div
-                    style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
-                    <h3 style="margin-top: 0;">📱 Gönderici Cihaz (Örn: Telefon)</h3>
-                    <p style="font-size: 0.85rem;">Bu cihazdaki verileri alıcıya göndermek için karekodu okutun.</p>
-                    <button class="btn-primary" id="btnScanQR" style="background: #6f42c1; width: 100%;"
-                        onclick="toggleQRScanner()">Kamerayı Aç ve Okut</button>
-                    <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
+                <div class="dash-card" onclick="switchView('syncView')">
+                    <div class="dash-icon">🔄</div>
+                    <h3>Aktarım & Yedek</h3>
+                    <p>Karekod ve dosya işlemleri</p>
                 </div>
             </div>
         </div>
 
-        <div class="action-buttons">
-            <button class="btn-warning" onclick="exportJSON()">💾 Tam Yedek Al (Fotoğraflı)</button>
-            <div>
-                <label
-                    style="display: inline-block; margin-right: 10px; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem;">
-                    📂 Yedek Yükle
-                    <input type="file" id="importJson" accept=".json" style="display: none;"
-                        onchange="importJSON(event)">
-                </label>
+        <!-- 2. BÖLÜM: YENİ HAYVAN EKLEME FORMU -->
+        <div id="addView" class="view-section">
+            <div class="card">
+                <h2 id="formTitle">Yeni Hayvan Ekle</h2>
+                <form id="animalForm">
+                    <input type="hidden" id="editId">
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Küpe Numarası</label>
+                            <input type="text" id="kupeNo" inputmode="numeric" pattern="[0-9]*" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Hayvan Lakabı</label>
+                            <input type="text" id="hayvanLakabi">
+                        </div>
+                        <div class="form-group">
+                            <label>Cinsiyeti</label>
+                            <select id="cinsiyet" required>
+                                <option value="">Seçiniz...</option>
+                                <option value="Erkek">Erkek</option>
+                                <option value="Dişi">Dişi</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Hayvanın Cinsi (Irkı)</label>
+                            <select id="hayvanCinsi" required>
+                                <option value="">Seçiniz...</option>
+                                <option value="simental">Simental </option>
+                                <option value="hollanda">Hollanda </option>
+                                <option value="simental-kırma">Simental Kırma </option>
+                                <option value="hollanda-kırma">Hollanda Kırma </option>
+                                <option value="montofon">Montofon</option>
+                                <option value="boz">Boz</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Doğum Tarihi</label>
+                            <input type="date" id="dogumTarihi" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Anne Küpe Numarası</label>
+                            <input type="text" id="anneKupeNo" inputmode="numeric" pattern="[0-9]*">
+                        </div>
+                        <div class="form-group">
+                            <label>Annesinin Cinsi (Irkı)</label>
+                            <select id="anneCinsi">
+                                <option value="">Seçiniz (Zorunlu Değil)</option>
+                                <option value="simental">Simental </option>
+                                <option value="hollanda">Hollanda </option>
+                                <option value="simental-kırma">Simental Kırma </option>
+                                <option value="hollanda-kırma">Hollanda Kırma </option>
+                                <option value="montofon">Montofon</option>
+                                <option value="boz">Boz</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Koğuştuğu Tarih</label>
+                            <input type="date" id="kogustuguTarih">
+                        </div>
+                    </div>
+
+                    <div class="grid">
+                        <div class="form-group">
+                            <label>Hayvanın Resmi</label>
+                            <input type="file" id="hayvanResmi" accept="image/*">
+                            <div class="preview-container">
+                                <img id="previewHayvan" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
+                                <button type="button" class="remove-img-btn" id="removeHayvanBtn" onclick="removeImage('hayvan')">&times;</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Anne Resmi</label>
+                            <input type="file" id="anneResmi" accept="image/*">
+                            <div class="preview-container">
+                                <img id="previewAnne" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
+                                <button type="button" class="remove-img-btn" id="removeAnneBtn" onclick="removeImage('anne')">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="submitBtn">Kaydet</button>
+                    <button type="button" class="btn-warning" id="cancelEditBtn" style="display:none; width: 100%; margin-top:5px;" onclick="cancelEdit()">İptal Et ve Listeye Dön</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 3. BÖLÜM: HAYVAN LİSTESİ VE ARAMA -->
+        <div id="listView" class="view-section">
+            <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
+            
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sırası</th>
+                            <th>Küpe No</th>
+                            <th>Lakap</th>
+                            <th>Cinsiyet</th>
+                            <th>Irk</th>
+                            <th>Doğum Tarihi</th>
+                            <th>Koğuştuğu Tarih</th>
+                            <th>Anne Küpe No</th>
+                            <th>Hayvan Resmi</th>
+                            <th>Anne Resmi</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <div id="pagination" class="pagination"></div>
+        </div>
+
+        <!-- 4. BÖLÜM: AKTARIM VE YEDEKLEME -->
+        <div id="syncView" class="view-section">
+            
+            <div class="card" id="syncCard">
+                <h2 style="margin-top: 0;">🔄 Karekod İle Cihazlar Arası Aktarım</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Uygulamayı bir cihazda alıcı, diğer cihazda gönderici olarak ayarlayarak verilerinizi saniyeler içinde senkronize edebilirsiniz.</p>
+                <div class="grid">
+                    <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                        <h3 style="margin-top: 0;">💻 Alıcı Cihaz (Örn: Bilgisayar)</h3>
+                        <p style="font-size: 0.85rem;">Verileri bu cihaza almak için bağlantı karekodu oluşturun.</p>
+                        <button class="btn-info" id="btnReceiveQR" style="width: 100%;" onclick="toggleReceiveQR()">Alıcı Karekodu Oluştur</button>
+                        <div id="qrcode-container" style="display: flex; justify-content: center; margin-top: 15px;"></div>
+                        <p id="peer-status" style="margin-top: 10px; font-weight: bold; color: #28a745; display: none; font-size: 0.9rem;">Bağlantı bekleniyor...</p>
+                    </div>
+                    <div style="text-align: center; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fa;">
+                        <h3 style="margin-top: 0;">📱 Gönderici Cihaz (Örn: Telefon)</h3>
+                        <p style="font-size: 0.85rem;">Bu cihazdaki verileri alıcıya göndermek için karekodu okutun.</p>
+                        <button class="btn-primary" id="btnScanQR" style="background: #6f42c1; width: 100%;" onclick="toggleQRScanner()">Kamerayı Aç ve Okut</button>
+                        <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- <button class="btn-info" onclick="optimizeDatabase()" style="background: #17a2b8;">🛠 Eski Verileri Optimize Et (Küçült)</button> -->
-        </div>
-
-        <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
-
-        <input type="text" id="searchInput" class="search-box"
-            placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
-        <div class="table-responsive">
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Sırası</th>
-                        <th>Küpe No</th>
-                        <th>Lakap</th>
-                        <th>Cinsiyet</th>
-                        <th>Irk</th>
-                        <th>Doğum Tarihi</th>
-                        <th>Koğuştuğu Tarih</th>
-                        <th>Anne Küpe No</th>
-                        <th>Hayvan Resmi</th>
-                        <th>Anne Resmi</th>
-                        <th>İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody"></tbody>
-            </table>
+            <div class="card">
+                <h2 style="margin-top: 0;">💾 Dosya İle Yedekleme İşlemleri</h2>
+                <div class="action-buttons" style="border: none; margin-bottom: 0;">
+                    <button class="btn-warning" onclick="exportJSON()" style="flex: 1;">💾 Tam Yedek Al (Fotoğraflı)</button>
+                    <label style="flex: 1; text-align: center; cursor: pointer; background: #6c757d; color: white; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: bold; margin-top: 0.5rem; display: inline-block;">
+                        📂 Yedek Yükle
+                        <input type="file" id="importJson" accept=".json" style="display: none;" onchange="importJSON(event)">
+                    </label>
+                </div>
+            </div>
 
         </div>
-        <div id="pagination" class="pagination"></div>
-
     </div>
 
+    <!-- ALT NAVİGASYON BARI -->
+    <nav id="bottomNav" class="bottom-nav" style="display: none;">
+        <button onclick="switchView('homeView')" class="active"><i>🏠</i>Ana Sayfa</button>
+        <button onclick="switchView('addView')"><i>➕</i>Ekle</button>
+        <button onclick="switchView('listView')"><i>📋</i>Sürü</button>
+        <button onclick="switchView('syncView')"><i>🔄</i>İşlemler</button>
+    </nav>
+
+    <!-- Resim Büyütme Modalı -->
     <div id="imageModal" class="modal" onclick="closeModal()">
         <span class="close-modal">&times;</span>
         <img class="modal-content" id="expandedImg">
     </div>
+    
     <script src="./script.js"></script>
 </body>
 
