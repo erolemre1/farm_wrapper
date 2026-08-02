@@ -18,7 +18,7 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -675,7 +675,12 @@ function handleImageUpload(inputId, previewId, isAnne) {
                 cancelEdit();
                 loadData();
             };
-            alert("Hayvan kaydı başarıyla " + (editId ? "güncellendi!" : "eklendi!"));
+Swal.fire({
+                    title: "Başarılı!",
+                    text: "Hayvan kaydı başarıyla " + (editId ? "güncellendi!" : "eklendi!"),
+                    icon: "success",
+                    confirmButtonColor: "#28a745"
+                });
         });
 
         function loadData() {
@@ -827,13 +832,26 @@ function handleImageUpload(inputId, previewId, isAnne) {
             base64Anne = "";
         };
 
-        window.deleteData = function (id) {
-            if (confirm("Bu kaydı silmek istediğinize emin misiniz?")) {
-                const tx = db.transaction("kayitlar", "readwrite");
-                tx.objectStore("kayitlar").delete(id);
-                tx.oncomplete = () => loadData();
-                alert("Kayıt başarıyla silindi!");
-            }
+window.deleteData = function (id) {
+            Swal.fire({
+                title: 'Emin misiniz?',
+                text: "Bu kaydı silmek istediğinize emin misiniz?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Evet, Sil!',
+                cancelButtonText: 'İptal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const tx = db.transaction("kayitlar", "readwrite");
+                    tx.objectStore("kayitlar").delete(id);
+                    tx.oncomplete = () => {
+                        loadData();
+                        Swal.fire('Silindi!', 'Kayıt başarıyla silindi.', 'success');
+                    };
+                }
+            });
         };
 
         window.openModal = function (src) {
@@ -865,54 +883,50 @@ window.exportJSON = function () {
         downloadAnchorNode.remove();
         
         hideLoading(); // Dosya inince kapat
-        alert("Yedek başarıyla alındı ve cihazınıza indirildi!");
+        Swal.fire('Yedek Alındı!', 'Yedek başarıyla alındı ve cihazınıza indirildi.', 'success');
     }, 100);
 };
 
 // Düzeltilmiş Yedek Yükleme Fonksiyonu
 window.importJSON = function (event) {
-    const file = event.target.files[0];
-    if (!file) return;
+            const file = event.target.files[0];
+            if (!file) return;
 
-    // Loading ekranından önce onayı al
-    if (!confirm("DİKKAT: Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK ve sadece yedekteki veriler yüklenecektir. Onaylıyor musunuz?")) {
-        event.target.value = '';
-        return;
-    }
-
-    showLoading("Yedek yükleniyor, lütfen bekleyiniz...");
-
-    // Tarayıcıya ekranı çizmesi için mola ver
-    setTimeout(() => {
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                const tx = db.transaction("kayitlar", "readwrite");
-                const store = tx.objectStore("kayitlar");
-
-                store.clear();
-                data.forEach(item => store.put(item));
-
-                tx.oncomplete = () => {
-                    hideLoading(); // İşlem BAŞARIYLA bitince kapat
-                    alert("Yedek başarıyla yüklendi ve eski veriler temizlendi!");
-                    loadData();
-                };
-                
-                tx.onerror = () => {
-                    hideLoading(); // Veritabanı hatası olursa kapat
-                    alert("Veriler yazılırken bir hata oluştu!");
-                };
-            } catch (err) {
-                hideLoading(); // JSON parse hatası olursa kapat
-                alert("Geçersiz yedek dosyası!");
-            }
+            Swal.fire({
+                title: 'DİKKAT!',
+                text: "Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK. Onaylıyor musunuz?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                confirmButtonText: 'Evet, Yükle!',
+                cancelButtonText: 'İptal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    showLoading("Yedek yükleniyor...");
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            const tx = db.transaction("kayitlar", "readwrite");
+                            const store = tx.objectStore("kayitlar");
+                            store.clear();
+                            data.forEach(item => store.put(item));
+                            tx.oncomplete = () => {
+                                hideLoading();
+                                Swal.fire('Tamamlandı!', 'Yedek başarıyla yüklendi.', 'success');
+                                loadData();
+                            };
+                        } catch (err) {
+                            hideLoading();
+                            Swal.fire('Hata', 'Geçersiz yedek dosyası!', 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                } else {
+                    event.target.value = '';
+                }
+            });
         };
-        reader.readAsText(file);
-    }, 100);
-};
-    
     
     </script>
 
@@ -1007,40 +1021,47 @@ window.toggleReceiveQR = function() {
             // 3. Gönderici tamamen bittiğini söylediğinde
             else if (msg.type === 'END') {
                 hideLoading(); 
-
-                if(confirm(`Karşı cihazdan ${incomingData.length} hayvan kaydı başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?`)) {
-                    
-                    showLoading("Veriler veritabanına işleniyor...");
-                    
-                    setTimeout(() => {
-                        const tx = db.transaction("kayitlar", "readwrite");
-                        const store = tx.objectStore("kayitlar");
-                        
-                        store.clear(); 
-                        incomingData.forEach(item => store.put(item)); 
-                        
-                        tx.oncomplete = () => { 
-                            hideLoading();
-                            alert("Veriler başarıyla aktarıldı!"); 
-                            loadData(); 
-                            resetPeerState(); 
-                        };
-                        tx.onerror = () => {
-                            hideLoading();
-                            alert("Veritabanına yazılırken bir hata oluştu!");
-                            resetPeerState(); 
-                        }
-                    }, 100);
-
-                } else {
+Swal.fire({
+        title: 'Veri Aktarımı Tamamlandı',
+        text: `Karşı cihazdan ${incomingData.length} hayvan kaydı başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Evet, Yükle',
+        cancelButtonText: 'İptal',
+        confirmButtonColor: '#28a745'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            showLoading("Veriler veritabanına işleniyor...");
+            
+            setTimeout(() => {
+                const tx = db.transaction("kayitlar", "readwrite");
+                const store = tx.objectStore("kayitlar");
+                
+                store.clear(); 
+                incomingData.forEach(item => store.put(item)); 
+                
+                tx.oncomplete = () => { 
+                    hideLoading();
+                    Swal.fire('Başarılı!', "Veriler başarıyla aktarıldı!", 'success');
+                    loadData(); 
+                    resetPeerState(); 
+                };
+                tx.onerror = () => {
+                    hideLoading();
+                    Swal.fire('Hata', "Veritabanına yazılırken bir hata oluştu!", 'error');
                     resetPeerState(); 
                 }
+            }, 100);
+        } else {
+            resetPeerState(); 
+        }
+    });
             }
         });
 
         conn.on('error', function(err) {
             hideLoading();
-            alert("Veri aktarımı sırasında bağlantı koptu veya hata oluştu.");
+            Swal.fire('Hata!', 'Veri aktarımı sırasında bağlantı koptu veya hata oluştu.', 'error');
             resetPeerState();
         });
     });
@@ -1088,7 +1109,7 @@ function hideLoading() {
                 btn.innerText = "Kapat";
                 btn.style.background = "#dc3545"; // Kırmızı renk
             }).catch((err) => {
-                alert("Kamera başlatılamadı: " + err);
+                Swal.fire('Hata!', 'Kamera başlatılamadı: ' + err, 'error');
                 resetScannerState();
             });
         };
@@ -1132,7 +1153,7 @@ function sendDataToPeer(targetPeerId) {
                         else {
                             conn.send({ type: 'END' });
                             hideLoading();
-                            alert("Tüm veriler karşı cihaza başarıyla gönderildi!");
+                            Swal.fire('Başarılı!', 'Tüm veriler karşı cihaza başarıyla gönderildi.', 'success');
                             setTimeout(() => resetPeerState(), 500);
                         }
                     }
@@ -1140,7 +1161,7 @@ function sendDataToPeer(targetPeerId) {
                 
                 conn.on('error', function(err) {
                     hideLoading();
-                    alert("Gönderim hatası: Bağlantı kurulamadı.");
+                    Swal.fire('Hata!', 'Gönderim hatası: Bağlantı kurulamadı.', 'error');
                     resetPeerState();
                 });
             };
@@ -1170,10 +1191,22 @@ function sendDataToPeer(targetPeerId) {
                         newWorker.addEventListener('statechange', () => {
                             // Yeni SW kurulduysa ve eski bir kontrolcü varsa (yani bu ilk giriş değilse)
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                if (confirm("🚀 Uygulamanın yeni bir sürümü yayınlandı! Şimdi güncellemek ister misiniz?")) {
-                                    newWorker.postMessage({ type: 'SKIP_WAITING' });
-                                    window.location.reload();
-                                }
+                              // Eski confirm kodunu sil ve yerine bunu koy:
+Swal.fire({
+    title: 'Yeni Sürüm Mevcut!',
+    text: '🚀 Uygulamanın yeni bir sürümü yayınlandı! Şimdi güncellemek ister misiniz?',
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonText: 'Evet, Güncelle',
+    cancelButtonText: 'Daha Sonra',
+    confirmButtonColor: '#28a745',
+    cancelButtonColor: '#6c757d'
+}).then((result) => {
+    if (result.isConfirmed) {
+        newWorker.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
+    }
+});
                             }
                         });
                     });
@@ -1257,19 +1290,19 @@ window.optimizeDatabase = async function() {
 
             txWrite.oncomplete = () => {
                 hideLoading();
-                alert(`Optimizasyon tamamlandı! Toplam ${updatedRecords.length} adet ağır kayıt başarıyla küçültüldü. Artık karekod aktarımı sorunsuz çalışacaktır.`);
+                Swal.fire('Optimizasyon Tamamlandı!', `Optimizasyon tamamlandı! Toplam ${updatedRecords.length} adet ağır kayıt başarıyla küçültüldü. Artık karekod aktarımı sorunsuz çalışacaktır.`, 'success');
                 loadData();
             };
 
             txWrite.onerror = () => {
                 hideLoading();
-                alert("Veriler yazılırken bir hata oluştu.");
+                Swal.fire('Hata!', 'Veriler yazılırken bir hata oluştu.', 'error');
             };
 
         } else {
             // Eğer hiçbir fotoğraf büyük değilse (zaten optimize edilmişse)
             hideLoading();
-            alert("Harika! Veritabanında sıkıştırılması gereken ağır bir fotoğraf bulunamadı.");
+            Swal.fire('Optimizasyon Tamamlandı!', 'Harika! Veritabanında sıkıştırılması gereken ağır bir fotoğraf bulunamadı.', 'success');
         }
     };
 };
