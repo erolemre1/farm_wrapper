@@ -796,6 +796,7 @@
                 const tx = db.transaction("kayitlar", "readwrite");
                 tx.objectStore("kayitlar").delete(id);
                 tx.oncomplete = () => loadData();
+                alert("Kayıt başarıyla silindi!");
             }
         };
 
@@ -898,47 +899,83 @@
             }
         }
 
-        window.toggleReceiveQR = function () {
-            const btn = document.getElementById('btnReceiveQR');
+window.toggleReceiveQR = function() {
+    const btn = document.getElementById('btnReceiveQR');
+    
+    // Zaten açıksa kapat
+    if (btn.innerText === "Kapat") {
+        resetPeerState();
+        return;
+    }
+    
+    resetPeerState(); 
+    peer = new Peer(); 
+    
+    peer.on('open', function(id) {
+        new QRCode(document.getElementById("qrcode-container"), id);
+        document.getElementById('peer-status').style.display = 'block';
+        document.getElementById('peer-status').innerText = 'Bağlantı bekleniyor... (Uygulamayı kapatmayın)';
+        
+        btn.innerText = "Kapat";
+        btn.style.background = "#dc3545"; 
+    });
 
-            if (btn.innerText === "Kapat") {
-                resetPeerState();
-                return;
-            }
+    // Gönderici cihaz karekodu okutup bağlandığı an tetiklenir
+    peer.on('connection', function(conn) {
+        
+        // 1. ADIM: Ağ üzerinden indirme başlıyor. Hemen Loading açıyoruz.
+        showLoading("Gönderici cihazla bağlantı sağlandı. Büyük veriler indiriliyor, lütfen bekleyiniz...");
 
-            resetPeerState();
-            peer = new Peer();
+        // 2. ADIM: Verinin tamamı (Tüm Base64 fotoğraflar dahil) cihaza indiğinde tetiklenir.
+        conn.on('data', function(data) {
+            
+            // İndirme bitti, loading ekranını kapat
+            hideLoading(); 
 
-            peer.on('open', function (id) {
-                new QRCode(document.getElementById("qrcode-container"), id);
-                document.getElementById('peer-status').style.display = 'block';
-                document.getElementById('peer-status').innerText = 'Bağlantı bekleniyor... (Uygulamayı kapatmayın)';
-
-                btn.innerText = "Kapat";
-                btn.style.background = "#dc3545";
-            });
-
-            peer.on('connection', function (conn) {
-                conn.on('data', function (data) {
-                    if (confirm("Karşı cihazdan yeni veriler geldi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
-                        const tx = db.transaction("kayitlar", "readwrite");
-                        const store = tx.objectStore("kayitlar");
-
-                        store.clear();
-                        data.forEach(item => store.put(item));
-
-                        tx.oncomplete = () => {
-                            alert("Veriler başarıyla aktarıldı!");
-                            loadData();
-                            resetPeerState();
-                        };
-                    } else {
-                        resetPeerState();
+            // Kullanıcıdan mevcut DB'yi silmek için onay iste
+            if(confirm("Karşı cihazdan veriler başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
+                
+                // 3. ADIM: Onay verildi, DB'ye yazılırken yeni loading aç
+                showLoading("Veriler veritabanına işleniyor...");
+                
+                setTimeout(() => {
+                    const tx = db.transaction("kayitlar", "readwrite");
+                    const store = tx.objectStore("kayitlar");
+                    
+                    store.clear();
+                    data.forEach(item => store.put(item));
+                    
+                    tx.oncomplete = () => { 
+                        hideLoading();
+                        alert("Veriler başarıyla aktarıldı!"); 
+                        loadData(); 
+                        resetPeerState(); 
+                    };
+                    tx.onerror = () => {
+                        hideLoading();
+                        alert("Veritabanına yazılırken bir hata oluştu!");
+                        resetPeerState(); 
                     }
-                });
-            });
-        };
+                }, 100);
 
+            } else {
+                // Kullanıcı reddederse her şeyi sıfırla
+                resetPeerState(); 
+            }
+        });
+
+        // Olası bağlantı kopmalarında uygulamanın donuk kalmasını engelle
+        conn.on('error', function(err) {
+            hideLoading();
+            alert("Veri aktarımı sırasında bağlantı koptu veya hata oluştu.");
+            resetPeerState();
+        });
+
+        conn.on('close', function() {
+            hideLoading();
+        });
+    });
+};
         function showLoading(text) {
     if(text) document.getElementById('loadingText').innerText = text;
     document.getElementById('loadingOverlay').style.display = 'flex';
