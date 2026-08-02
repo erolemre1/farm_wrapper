@@ -4,7 +4,11 @@ const APP_SHELL = [
   './index.html',
   './style.css',
   './script.js',
-  './manifest.json'
+  './manifest.json',
+    'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+    'https://unpkg.com/html5-qrcode',
+    'https://cdn.jsdelivr.net/npm/sweetalert2@11'
 ];
 
 self.addEventListener('install', (event) => {
