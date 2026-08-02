@@ -1,24 +1,44 @@
-// update-version.js
-const fs = require('fs');
+const CACHE_NAME = 'ciftlik-pro-v1';
+const APP_SHELL = [
+  './',
+  './index.html',
+  './style.css',
+  './script.js',
+  './manifest.json'
+];
 
-const swPath = './sw.js';
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+  );
+  self.skipWaiting();
+});
 
-try {
-    // 1. sw.js dosyasını fiziksel olarak oku
-    let content = fs.readFileSync(swPath, 'utf8');
-    
-    // 2. Zaman damgasını oluştur
-    const newVersion = `ciftlik-pro-v${Date.now()}`;
-    
-    // 3. Eski CACHE_NAME satırını bul ve yenisiyle değiştir (Tırnak tipine bakmaksızın ezer)
-    content = content.replace(/const CACHE_NAME = .*/, `const CACHE_NAME = '${newVersion}';`);
-    
-    // 4. Dosyayı kaydet
-    fs.writeFileSync(swPath, content);
-    
-    console.log(`✅ Service Worker versiyonu başarıyla güncellendi: ${newVersion}`);
-} catch (err) {
-    console.error("❌ Versiyon güncellenirken hata oluştu:", err);
-    // Hata olursa Render'ın derlemeyi durdurması için çıkış kodu ekliyoruz
-    process.exit(1); 
-}
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(event.request)
+        .then((networkResponse) => {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return networkResponse;
+        })
+        .catch(() => caches.match('./index.html'));
+    })
+  );
+});
