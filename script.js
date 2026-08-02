@@ -620,7 +620,9 @@ if ('serviceWorker' in navigator) {
                                 updateAccepted = true;
                                 newWorker.postMessage({ type: 'SKIP_WAITING' });
                                 refreshing = true;
-                                window.location.reload();
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 500);
                             }
                         });
                     }
