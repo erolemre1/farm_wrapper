@@ -38,7 +38,8 @@ function handleEnter(e) {
 }
 
 // YENİ: Ekranlar Arası Geçiş Fonksiyonu
-window.switchView = function(viewId) {
+// YENİ: Ekranlar Arası Geçiş Fonksiyonu
+function switchView(viewId) {
     // 1. Tüm sayfaları gizle
     document.querySelectorAll('.view-section').forEach(el => {
         el.style.display = 'none';
@@ -57,7 +58,7 @@ window.switchView = function(viewId) {
 
     // 4. Sayfayı en üste kaydır
     window.scrollTo(0, 0);
-};
+}
 
 let db;
 let base64Hayvan = "";
