@@ -731,10 +731,11 @@ if ('serviceWorker' in navigator) {
                             title: 'Yeni Sürüm Mevcut!',
                             text: '🚀 Uygulamanın yeni bir sürümü yayınlandı! Şimdi güncellemek ister misiniz?',
                             icon: 'info',
-                            showCancelButton: false,
-                            allowOutsideClick: false,
+                            showCancelButton: true, // BURASI DEĞİŞTİ
+                            allowOutsideClick: false, // Kullanıcıyı karar vermeye zorlamak için kapalı kalması iyi
                             allowEscapeKey: false,
                             confirmButtonText: 'Evet, Güncelle',
+                            cancelButtonText: 'Daha Sonra', // BURASI EKLENDİ
                             confirmButtonColor: '#28a745',
                             cancelButtonColor: '#6c757d',
                             didClose: () => {
@@ -747,6 +748,7 @@ if ('serviceWorker' in navigator) {
                                 refreshing = true;
                                 window.location.reload();
                             }
+                            // else durumu yazmıyoruz. "Daha Sonra" derse uyarı kapanır, işine devam eder.
                         });
                     }
                 });
