@@ -713,29 +713,38 @@ function sendDataToPeer(targetPeerId) {
 
 
 // PWA GÜNCELLEME VE SERVICE WORKER KONTROLÜ
+let updatePromptShown = false;
+let updateAccepted = false;
+
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
             console.log('Service Worker başarıyla kaydedildi.', reg);
 
-            // Yeni bir güncelleme algılandığında
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
                 newWorker.addEventListener('statechange', () => {
-                    // Yeni SW kurulduysa ve eski bir kontrolcü varsa (yani bu ilk giriş değilse)
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        // Eski confirm kodunu sil ve yerine bunu koy:
+                    if (!updatePromptShown && newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        updatePromptShown = true;
+
                         Swal.fire({
                             title: 'Yeni Sürüm Mevcut!',
                             text: '🚀 Uygulamanın yeni bir sürümü yayınlandı! Şimdi güncellemek ister misiniz?',
                             icon: 'info',
                             showCancelButton: false,
+                            allowOutsideClick: false,
+                            allowEscapeKey: false,
                             confirmButtonText: 'Evet, Güncelle',
                             confirmButtonColor: '#28a745',
-                            cancelButtonColor: '#6c757d'
+                            cancelButtonColor: '#6c757d',
+                            didClose: () => {
+                                updatePromptShown = false;
+                            }
                         }).then((result) => {
                             if (result.isConfirmed) {
+                                updateAccepted = true;
                                 newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                refreshing = true;
                                 window.location.reload();
                             }
                         });
@@ -744,12 +753,11 @@ if ('serviceWorker' in navigator) {
             });
         }).catch(err => console.log('Service worker hatası', err));
 
-        // Güncelleme onaylandığında sayfanın sorunsuz yenilenmesini garantile
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
-                window.location.reload();
+            if (!refreshing && updateAccepted) {
                 refreshing = true;
+                window.location.reload();
             }
         });
     });
