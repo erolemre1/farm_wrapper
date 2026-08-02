@@ -1,24 +1,41 @@
-const CACHE_NAME = 'ciftlik-v2';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './cow.png',
-//   'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'
+const CACHE_NAME = 'ciftlik-pro-v1'; 
+
+const ASSETS = [
+    './',
+    './index.html',
+    './manifest.json',
+    './cow.png',
+    'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+    'https://unpkg.com/html5-qrcode'
 ];
 
-// Kurulum (Install) - Dosyaları önbelleğe al
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS_TO_CACHE))
-  );
+self.addEventListener('install', (e) => {
+    e.waitUntil(
+        caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    );
+    self.skipWaiting(); 
 });
 
-// İnternet varken ağı kullan, yoksa önbellekten (cache) getir (Network First)
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
-  );
+self.addEventListener('activate', (e) => {
+    e.waitUntil(
+        caches.keys().then(keys => {
+            return Promise.all(
+                keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+            );
+        })
+    );
+    self.clients.claim();
+});
+
+self.addEventListener('fetch', (e) => {
+    e.respondWith(
+        caches.match(e.request).then(res => {
+            return res || fetch(e.request);
+        }).catch(() => {
+            if (e.request.mode === 'navigate') {
+                return caches.match('./index.html');
+            }
+        })
+    );
 });
