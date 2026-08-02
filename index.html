@@ -1025,51 +1025,68 @@ function hideLoading() {
         };
 
         // 3. Gönderici Cihazdan Veriyi Karşıya Fırlatma
-        function sendDataToPeer(targetPeerId) {
-            if (!peer || peer.destroyed) {
-                peer = new Peer();
-            }
+// GÖNDERİCİ: Verileri tek tek paketleyip gönderir
+function sendDataToPeer(targetPeerId) {
+    if (!peer || peer.destroyed) {
+        peer = new Peer();
+    }
 
-            const connectAndSend = () => {
-                showLoading("Veriler toplanıyor ve karşı cihaza gönderiliyor...");
-                const tx = db.transaction("kayitlar", "readonly");
-                const request = tx.objectStore("kayitlar").getAll();
+    const connectAndSend = () => {
+        showLoading("Alıcı cihaza bağlanılıyor...");
+        
+        setTimeout(() => {
+            const tx = db.transaction("kayitlar", "readonly");
+            const request = tx.objectStore("kayitlar").getAll();
 
-                request.onsuccess = () => {
-                    const allData = request.result;
-                    const conn = peer.connect(targetPeerId);
-
-                    conn.on('open', function () {
-                        conn.send(allData);
-                        hideLoading();
-                        alert("Veriler karşı cihaza başarıyla gönderildi!");
-
-                        setTimeout(() => {
-                            if (peer) {
-                                peer.destroy();
-                                peer = null;
-                            }
-                        }, 1000);
-                    });
-
-                    conn.on('error', function (err) {
-                        alert("Gönderim hatası: Bağlantı kurulamadı.");
-                        if (peer) {
-                            peer.destroy();
-                            peer = null;
-                        }
-                    });
-                };
-            };
-
-            if (peer.open) {
-                connectAndSend();
-            } else {
-                peer.on('open', () => {
-                    connectAndSend();
+            request.onsuccess = () => {
+                const allData = request.result;
+                const conn = peer.connect(targetPeerId);
+                
+                // async function yapıyoruz ki yavaşlatma (bekleme) kullanabilelim
+                conn.on('open', async function() {
+                    // 1. Önce alıcıya kaç hayvan göndereceğimizi haber veriyoruz
+                    conn.send({ type: 'START', total: allData.length });
+                    
+                    // 2. Döngü ile hayvanları TEK TEK gönderiyoruz
+                    for (let i = 0; i < allData.length; i++) {
+                        // Gönderici ekranındaki sayacı güncelle
+                        showLoading(`Gönderiliyor: ${i + 1} / ${allData.length} hayvan...`);
+                        
+                        // Sadece 1 hayvanın bilgisini gönder
+                        conn.send({ type: 'CHUNK', data: allData[i] });
+                        
+                        // Çok kritik: Tarayıcı boğulmasın diye her gönderim arası 50 milisaniye nefes aldırıyoruz
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                    
+                    // 3. Tüm veriler bittiğinde bitiş sinyalini gönder
+                    conn.send({ type: 'END' });
+                    
+                    hideLoading();
+                    alert("Tüm veriler karşı cihaza başarıyla gönderildi!");
+                    
+                    setTimeout(() => {
+                        resetPeerState();
+                    }, 500);
                 });
-            }
-        }
+                
+                conn.on('error', function(err) {
+                    hideLoading();
+                    alert("Gönderim hatası: Bağlantı kurulamadı.");
+                    resetPeerState();
+                });
+            };
+        }, 100);
+    };
+
+    if (peer.open) {
+        connectAndSend();
+    } else {
+        peer.on('open', () => {
+            connectAndSend();
+        });
+    }
+}
     </script>
 
 <script>
