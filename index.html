@@ -849,6 +849,7 @@ function handleImageUpload(inputId, previewId, isAnne) {
         };
 
         window.exportJSON = function () {
+            showLoading("Yedek alınıyor, lütfen bekleyiniz...");
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
             const today = new Date().toISOString().split('T')[0];
             const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
@@ -858,9 +859,12 @@ function handleImageUpload(inputId, previewId, isAnne) {
             document.body.appendChild(downloadAnchorNode);
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
+            hideLoading();
         };
 
         window.importJSON = function (event) {
+            showLoading("Yedek yükleniyor, lütfen bekleyiniz...");
+
             const file = event.target.files[0];
             if (!file) return;
 
@@ -885,9 +889,11 @@ function handleImageUpload(inputId, previewId, isAnne) {
                     };
                 } catch (err) {
                     alert("Geçersiz yedek dosyası!");
+                   hideLoading();
                 }
             };
             reader.readAsText(file);
+            hideLoading();
         };
     </script>
 
