@@ -920,47 +920,57 @@ window.toggleReceiveQR = function() {
         btn.style.background = "#dc3545"; 
     });
 
-    // Gönderici cihaz karekodu okutup bağlandığı an tetiklenir
     peer.on('connection', function(conn) {
         
-        // 1. ADIM: Ağ üzerinden indirme başlıyor. Hemen Loading açıyoruz.
-        showLoading("Gönderici cihazla bağlantı sağlandı. Büyük veriler indiriliyor, lütfen bekleyiniz...");
+        // Gelen parçaları tutacağımız dizi ve toplam beklenen sayı
+        let incomingData = [];
+        let expectedTotal = 0;
 
-        // 2. ADIM: Verinin tamamı (Tüm Base64 fotoğraflar dahil) cihaza indiğinde tetiklenir.
-        conn.on('data', function(data) {
+        conn.on('data', function(msg) {
             
-            // İndirme bitti, loading ekranını kapat
-            hideLoading(); 
+            // 1. Gönderim başlıyor sinyali
+            if (msg.type === 'START') {
+                incomingData = []; // Diziyi sıfırla
+                expectedTotal = msg.total;
+                showLoading(`Bağlantı kuruldu. 0 / ${expectedTotal} hayvan indiriliyor...`);
+            } 
+            // 2. Tekil hayvan verisi (CHUNK) geldiğinde
+            else if (msg.type === 'CHUNK') {
+                incomingData.push(msg.data); // Gelen hayvanı listeye ekle
+                showLoading(`İndiriliyor: ${incomingData.length} / ${expectedTotal} hayvan tamamlandı...`);
+            } 
+            // 3. Gönderim tamamen BİTTİĞİNDE (Sadece 1 kere çalışacak)
+            else if (msg.type === 'END') {
+                hideLoading(); 
 
-            // Kullanıcıdan mevcut DB'yi silmek için onay iste
-            if(confirm("Karşı cihazdan veriler başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?")) {
-                
-                // 3. ADIM: Onay verildi, DB'ye yazılırken yeni loading aç
-                showLoading("Veriler veritabanına işleniyor...");
-                
-                setTimeout(() => {
-                    const tx = db.transaction("kayitlar", "readwrite");
-                    const store = tx.objectStore("kayitlar");
+                // Kullanıcıdan SADECE aktarım tamamen bitince 1 KERE onay iste
+                if(confirm(`Karşı cihazdan ${incomingData.length} hayvan kaydı başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?`)) {
                     
-                    store.clear();
-                    data.forEach(item => store.put(item));
+                    showLoading("Veriler veritabanına işleniyor...");
                     
-                    tx.oncomplete = () => { 
-                        hideLoading();
-                        alert("Veriler başarıyla aktarıldı!"); 
-                        loadData(); 
-                        resetPeerState(); 
-                    };
-                    tx.onerror = () => {
-                        hideLoading();
-                        alert("Veritabanına yazılırken bir hata oluştu!");
-                        resetPeerState(); 
-                    }
-                }, 100);
+                    setTimeout(() => {
+                        const tx = db.transaction("kayitlar", "readwrite");
+                        const store = tx.objectStore("kayitlar");
+                        
+                        store.clear(); // Eskileri sil
+                        incomingData.forEach(item => store.put(item)); // Yenileri ekle
+                        
+                        tx.oncomplete = () => { 
+                            hideLoading();
+                            alert("Veriler başarıyla aktarıldı!"); 
+                            loadData(); 
+                            resetPeerState(); 
+                        };
+                        tx.onerror = () => {
+                            hideLoading();
+                            alert("Veritabanına yazılırken bir hata oluştu!");
+                            resetPeerState(); 
+                        }
+                    }, 100);
 
-            } else {
-                // Kullanıcı reddederse her şeyi sıfırla
-                resetPeerState(); 
+                } else {
+                    resetPeerState(); 
+                }
             }
         });
 
@@ -976,7 +986,7 @@ window.toggleReceiveQR = function() {
         });
     });
 };
-        function showLoading(text) {
+function showLoading(text) {
     if(text) document.getElementById('loadingText').innerText = text;
     document.getElementById('loadingOverlay').style.display = 'flex';
 }
