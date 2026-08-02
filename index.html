@@ -848,53 +848,71 @@ function handleImageUpload(inputId, previewId, isAnne) {
             document.getElementById("imageModal").style.display = "none";
         };
 
-        window.exportJSON = function () {
-            showLoading("Yedek alınıyor, lütfen bekleyiniz...");
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
-            const today = new Date().toISOString().split('T')[0];
-            const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}_${todayTime}.json`);
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
-            hideLoading();
-        };
+// Düzeltilmiş Yedek Alma Fonksiyonu
+window.exportJSON = function () {
+    showLoading("Yedek alınıyor, lütfen bekleyiniz...");
+    
+    // Tarayıcının loading ekranını çizmesine izin vermek için 100ms mola veriyoruz
+    setTimeout(() => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
+        const today = new Date().toISOString().split('T')[0];
+        const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}_${todayTime}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        
+        hideLoading(); // Dosya inince kapat
+    }, 100);
+};
 
-        window.importJSON = function (event) {
-            showLoading("Yedek yükleniyor, lütfen bekleyiniz...");
+// Düzeltilmiş Yedek Yükleme Fonksiyonu
+window.importJSON = function (event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-            const file = event.target.files[0];
-            if (!file) return;
+    // Loading ekranından önce onayı al
+    if (!confirm("DİKKAT: Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK ve sadece yedekteki veriler yüklenecektir. Onaylıyor musunuz?")) {
+        event.target.value = '';
+        return;
+    }
 
-            if (!confirm("DİKKAT: Yedek yüklediğinizde mevcut tüm verileriniz SİLİNECEK ve sadece yedekteki veriler yüklenecektir. Onaylıyor musunuz?")) {
-                event.target.value = '';
-                return;
+    showLoading("Yedek yükleniyor, lütfen bekleyiniz...");
+
+    // Tarayıcıya ekranı çizmesi için mola ver
+    setTimeout(() => {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                const tx = db.transaction("kayitlar", "readwrite");
+                const store = tx.objectStore("kayitlar");
+
+                store.clear();
+                data.forEach(item => store.put(item));
+
+                tx.oncomplete = () => {
+                    hideLoading(); // İşlem BAŞARIYLA bitince kapat
+                    alert("Yedek başarıyla yüklendi ve eski veriler temizlendi!");
+                    loadData();
+                };
+                
+                tx.onerror = () => {
+                    hideLoading(); // Veritabanı hatası olursa kapat
+                    alert("Veriler yazılırken bir hata oluştu!");
+                };
+            } catch (err) {
+                hideLoading(); // JSON parse hatası olursa kapat
+                alert("Geçersiz yedek dosyası!");
             }
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    const tx = db.transaction("kayitlar", "readwrite");
-                    const store = tx.objectStore("kayitlar");
-
-                    store.clear();
-                    data.forEach(item => store.put(item));
-
-                    tx.oncomplete = () => {
-                        alert("Yedek başarıyla yüklendi ve eski veriler temizlendi!");
-                        loadData();
-                    };
-                } catch (err) {
-                    alert("Geçersiz yedek dosyası!");
-                   hideLoading();
-                }
-            };
-            reader.readAsText(file);
-            hideLoading();
         };
+        reader.readAsText(file);
+    }, 100);
+};
+    
+    
     </script>
 
     <script>
