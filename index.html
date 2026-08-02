@@ -902,7 +902,6 @@
 window.toggleReceiveQR = function() {
     const btn = document.getElementById('btnReceiveQR');
     
-    // Zaten açıksa kapat
     if (btn.innerText === "Kapat") {
         resetPeerState();
         return;
@@ -922,28 +921,32 @@ window.toggleReceiveQR = function() {
 
     peer.on('connection', function(conn) {
         
-        // Gelen parçaları tutacağımız dizi ve toplam beklenen sayı
         let incomingData = [];
         let expectedTotal = 0;
 
         conn.on('data', function(msg) {
             
-            // 1. Gönderim başlıyor sinyali
+            // 1. Gönderici aktarımı başlatmak istiyor
             if (msg.type === 'START') {
-                incomingData = []; // Diziyi sıfırla
+                incomingData = []; 
                 expectedTotal = msg.total;
                 showLoading(`Bağlantı kuruldu. 0 / ${expectedTotal} hayvan indiriliyor...`);
+                
+                // Alıcı hazır olduğunu Göndericiye bildiriyor
+                conn.send({ type: 'READY' });
             } 
-            // 2. Tekil hayvan verisi (CHUNK) geldiğinde
+            // 2. Tekil hayvan verisi geldiğinde
             else if (msg.type === 'CHUNK') {
-                incomingData.push(msg.data); // Gelen hayvanı listeye ekle
+                incomingData.push(msg.data); 
                 showLoading(`İndiriliyor: ${incomingData.length} / ${expectedTotal} hayvan tamamlandı...`);
+                
+                // Hayvanı başarıyla aldığını Göndericiye bildiriyor (Ping-Pong)
+                conn.send({ type: 'ACK' });
             } 
-            // 3. Gönderim tamamen BİTTİĞİNDE (Sadece 1 kere çalışacak)
+            // 3. Gönderici tamamen bittiğini söylediğinde
             else if (msg.type === 'END') {
                 hideLoading(); 
 
-                // Kullanıcıdan SADECE aktarım tamamen bitince 1 KERE onay iste
                 if(confirm(`Karşı cihazdan ${incomingData.length} hayvan kaydı başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?`)) {
                     
                     showLoading("Veriler veritabanına işleniyor...");
@@ -952,8 +955,8 @@ window.toggleReceiveQR = function() {
                         const tx = db.transaction("kayitlar", "readwrite");
                         const store = tx.objectStore("kayitlar");
                         
-                        store.clear(); // Eskileri sil
-                        incomingData.forEach(item => store.put(item)); // Yenileri ekle
+                        store.clear(); 
+                        incomingData.forEach(item => store.put(item)); 
                         
                         tx.oncomplete = () => { 
                             hideLoading();
@@ -974,15 +977,10 @@ window.toggleReceiveQR = function() {
             }
         });
 
-        // Olası bağlantı kopmalarında uygulamanın donuk kalmasını engelle
         conn.on('error', function(err) {
             hideLoading();
             alert("Veri aktarımı sırasında bağlantı koptu veya hata oluştu.");
             resetPeerState();
-        });
-
-        conn.on('close', function() {
-            hideLoading();
         });
     });
 };
@@ -1034,8 +1032,6 @@ function hideLoading() {
             });
         };
 
-        // 3. Gönderici Cihazdan Veriyi Karşıya Fırlatma
-// GÖNDERİCİ: Verileri tek tek paketleyip gönderir
 function sendDataToPeer(targetPeerId) {
     if (!peer || peer.destroyed) {
         peer = new Peer();
@@ -1052,32 +1048,33 @@ function sendDataToPeer(targetPeerId) {
                 const allData = request.result;
                 const conn = peer.connect(targetPeerId);
                 
-                // async function yapıyoruz ki yavaşlatma (bekleme) kullanabilelim
-                conn.on('open', async function() {
-                    // 1. Önce alıcıya kaç hayvan göndereceğimizi haber veriyoruz
+                let currentIndex = 0; // Hangi hayvanda kaldığımızı tutan sayaç
+                
+                conn.on('open', function() {
+                    // 1. Alıcıya kaç hayvan göndereceğimizi bildirip, ondan "Hazırım" cevabı bekliyoruz
                     conn.send({ type: 'START', total: allData.length });
+                });
+
+                // Alıcıdan gelen cevapları dinliyoruz
+                conn.on('data', function(msg) {
                     
-                    // 2. Döngü ile hayvanları TEK TEK gönderiyoruz
-                    for (let i = 0; i < allData.length; i++) {
-                        // Gönderici ekranındaki sayacı güncelle
-                        showLoading(`Gönderiliyor: ${i + 1} / ${allData.length} hayvan...`);
+                    // Alıcı hazırsa (READY) veya bir önceki hayvanı başarıyla aldıysa (ACK)
+                    if (msg.type === 'READY' || msg.type === 'ACK') {
                         
-                        // Sadece 1 hayvanın bilgisini gönder
-                        conn.send({ type: 'CHUNK', data: allData[i] });
-                        
-                        // Çok kritik: Tarayıcı boğulmasın diye her gönderim arası 50 milisaniye nefes aldırıyoruz
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        // Eğer hala gönderilecek hayvan varsa
+                        if (currentIndex < allData.length) {
+                            showLoading(`Gönderiliyor: ${currentIndex + 1} / ${allData.length} hayvan...`);
+                            conn.send({ type: 'CHUNK', data: allData[currentIndex] });
+                            currentIndex++; // Sayacı bir artır
+                        } 
+                        // Tüm hayvanlar bittiyse
+                        else {
+                            conn.send({ type: 'END' });
+                            hideLoading();
+                            alert("Tüm veriler karşı cihaza başarıyla gönderildi!");
+                            setTimeout(() => resetPeerState(), 500);
+                        }
                     }
-                    
-                    // 3. Tüm veriler bittiğinde bitiş sinyalini gönder
-                    conn.send({ type: 'END' });
-                    
-                    hideLoading();
-                    alert("Tüm veriler karşı cihaza başarıyla gönderildi!");
-                    
-                    setTimeout(() => {
-                        resetPeerState();
-                    }, 5000);
                 });
                 
                 conn.on('error', function(err) {
