@@ -1,5 +1,6 @@
 const CACHE_NAME = `ciftlik-pro-v${Date.now()}`; 
 
+
 const ASSETS = [
     './',
     './index.html',
