@@ -203,7 +203,7 @@
         }
 
         .page-btn {
-            padding: 5px 12px;
+            padding: 10px 15px;
             background: #e9ecef;
             color: black;
             border-radius: 4px;
@@ -256,7 +256,7 @@
 
         .login-card {
             background: white;
-            padding: 2rem;
+            padding: 1rem;
             border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             width: 100%;
