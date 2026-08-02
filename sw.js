@@ -1,42 +1,24 @@
-const CACHE_NAME = 'ciftlik-pro-v1';
+// update-version.js
+const fs = require('fs');
 
+const swPath = './sw.js';
 
-const ASSETS = [
-    './',
-    './index.html',
-    './manifest.json',
-    './cow.png',
-    'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-    'https://unpkg.com/html5-qrcode'
-];
-
-self.addEventListener('install', (e) => {
-    e.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-    );
-    self.skipWaiting(); 
-});
-
-self.addEventListener('activate', (e) => {
-    e.waitUntil(
-        caches.keys().then(keys => {
-            return Promise.all(
-                keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-            );
-        })
-    );
-    self.clients.claim();
-});
-
-self.addEventListener('fetch', (e) => {
-    e.respondWith(
-        caches.match(e.request).then(res => {
-            return res || fetch(e.request);
-        }).catch(() => {
-            if (e.request.mode === 'navigate') {
-                return caches.match('./index.html');
-            }
-        })
-    );
-});
+try {
+    // 1. sw.js dosyasını fiziksel olarak oku
+    let content = fs.readFileSync(swPath, 'utf8');
+    
+    // 2. Zaman damgasını oluştur
+    const newVersion = `ciftlik-pro-v${Date.now()}`;
+    
+    // 3. Eski CACHE_NAME satırını bul ve yenisiyle değiştir (Tırnak tipine bakmaksızın ezer)
+    content = content.replace(/const CACHE_NAME = .*/, `const CACHE_NAME = '${newVersion}';`);
+    
+    // 4. Dosyayı kaydet
+    fs.writeFileSync(swPath, content);
+    
+    console.log(`✅ Service Worker versiyonu başarıyla güncellendi: ${newVersion}`);
+} catch (err) {
+    console.error("❌ Versiyon güncellenirken hata oluştu:", err);
+    // Hata olursa Render'ın derlemeyi durdurması için çıkış kodu ekliyoruz
+    process.exit(1); 
+}
