@@ -1034,12 +1034,36 @@ function hideLoading() {
         }
     </script>
 
-    <script>
+<script>
+        // PWA GÜNCELLEME VE SERVICE WORKER KONTROLÜ
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Çevrimdışı mod aktif.', reg))
-                    .catch(err => console.log('Service worker hatası', err));
+                navigator.serviceWorker.register('./sw.js').then(reg => {
+                    console.log('Service Worker başarıyla kaydedildi.', reg);
+
+                    // Yeni bir güncelleme algılandığında
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            // Yeni SW kurulduysa ve eski bir kontrolcü varsa (yani bu ilk giriş değilse)
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                if (confirm("🚀 Uygulamanın yeni bir sürümü yayınlandı! Şimdi güncellemek ister misiniz?")) {
+                                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                    window.location.reload();
+                                }
+                            }
+                        });
+                    });
+                }).catch(err => console.log('Service worker hatası', err));
+
+                // Güncelleme onaylandığında sayfanın sorunsuz yenilenmesini garantile
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        window.location.reload();
+                        refreshing = true;
+                    }
+                });
             });
         }
     </script>
