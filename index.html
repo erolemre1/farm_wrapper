@@ -264,7 +264,21 @@
         <span class="close-modal">&times;</span>
         <img class="modal-content" id="expandedImg">
     </div>
-    
+    <!-- YENİ: Cihaza Yükleme (PWA) Modalı -->
+<div id="installModal" class="modal" style="z-index: 10000;">
+    <div class="modal-content install-card">
+        <span class="close-modal" onclick="closeInstallModal()" style="color: #333; top: 10px; right: 15px;">&times;</span>
+        <div style="font-size: 3.5rem; margin-bottom: 10px;">📲</div>
+        <h3 style="margin-top: 0;">Uygulamayı Cihazınıza Yükleyin</h3>
+        <p id="installMessage" style="color: #555; font-size: 0.95rem; margin-bottom: 20px;">
+            Çiftlik Veri Yönetimi uygulamasını telefonunuza yükleyerek daha hızlı erişebilir ve internetsiz (çevrimdışı) ortamda da çalışmaya devam edebilirsiniz!
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button class="btn-primary" id="installBtn" onclick="installApp()" style="flex: 1; padding: 12px; font-size: 1rem;">Hemen Yükle</button>
+            <button class="btn-warning" onclick="closeInstallModal()" style="flex: 1; padding: 12px; font-size: 1rem; background: #e2e3e5; color: #333;">Daha Sonra</button>
+        </div>
+    </div>
+</div>
     <script src="./script.js"></script>
 </body>
 

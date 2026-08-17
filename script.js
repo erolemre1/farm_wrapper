@@ -706,3 +706,92 @@ window.clearSearch = function () {
     
     document.getElementById('searchInput').focus();
 };
+
+
+
+
+/* --- PWA CİHAZA YÜKLEME (INSTALL) İŞLEMLERİ (ÇEREZ KONTROLLÜ) --- */
+
+// Çerez (Cookie) Oluşturma Fonksiyonu
+function setCookie(name, value, days) {
+    let expires = "";
+    if (days) {
+        let date = new Date();
+        // Belirtilen gün sayısı kadar süreyi milisaniye cinsinden ekle
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+
+// Çerez (Cookie) Okuma Fonksiyonu
+function getCookie(name) {
+    let nameEQ = name + "=";
+    let ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
+let deferredPrompt;
+
+// 1. Android ve Masaüstü cihazlar için
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    // LocalStorage yerine Cookie kontrolü yapıyoruz
+    if (!getCookie('installPromptShown')) {
+        setTimeout(showInstallModal, 2500);
+    }
+});
+
+// 2. iOS (iPhone/iPad) cihazlar için
+function checkIOSInstall() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+    // LocalStorage yerine Cookie kontrolü yapıyoruz
+    if (isIOS && !isStandalone && !getCookie('installPromptShown')) {
+        setTimeout(() => {
+            document.getElementById('installMessage').innerHTML = 'Apple politikaları gereği uygulamamızı yüklemek için:<br><br><b>1.</b> Tarayıcınızın alt kısmındaki <b>Paylaş</b> <span style="font-size:1.2rem">⍐</span> ikonuna dokunun.<br><b>2.</b> Açılan menüden <b>Ana Ekrana Ekle</b> (Add to Home Screen) seçeneğini seçin.';
+            document.getElementById('installBtn').style.display = 'none';
+            showInstallModal();
+        }, 2500);
+    }
+}
+
+// 3. Modalı Göster
+function showInstallModal() {
+    document.getElementById('installModal').style.display = 'flex';
+}
+
+// 4. Modalı Kapat ve Çereze (Cookie) Kaydet
+window.closeInstallModal = function() {
+    document.getElementById('installModal').style.display = 'none';
+    
+    // "installPromptShown" çerezini "true" değeriyle 1 GÜNLÜK (1) oluştur.
+    // Eğer 3 gün sormasın isterseniz buradaki 1 değerini 3 yapabilirsiniz.
+    setCookie('installPromptShown', 'true', 1);
+};
+
+// 5. Yükle Butonuna Basılma Olayı (Android & Masaüstü)
+window.installApp = async function() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            console.log('Kullanıcı uygulamayı yüklemeyi kabul etti.');
+        }
+        deferredPrompt = null;
+    }
+    closeInstallModal();
+};
+
+// Sayfa yüklendiğinde iOS kontrolünü başlat
+window.addEventListener('load', () => {
+    checkIOSInstall();
+});
