@@ -654,3 +654,55 @@ document.addEventListener('click', function (event) {
         passwordInput.focus();
     }
 });
+
+window.applyFilter = function () {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const filterCinsiyet = document.getElementById('filterCinsiyet').value;
+    const filterIrk = document.getElementById('filterIrk').value;
+    
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    filteredData = allData.filter(row => {
+        const kupe = (row.kupeNo || "").toLowerCase();
+        const lakap = (row.hayvanLakabi || "").toLowerCase();
+        const matchesSearch = kupe.includes(searchTerm) || lakap.includes(searchTerm);
+        const matchesCinsiyet = filterCinsiyet === "" || row.cinsiyet === filterCinsiyet;
+        const matchesIrk = filterIrk === "" || row.hayvanCinsi === filterIrk;
+
+        let matchesDate = true;
+        if (startDate || endDate) {
+            if (!row.dogumTarihi) {
+                matchesDate = false;
+            } else {
+                if (startDate && row.dogumTarihi < startDate) matchesDate = false;
+                if (endDate && row.dogumTarihi > endDate) matchesDate = false;
+            }
+        }
+
+        return matchesSearch && matchesCinsiyet && matchesIrk && matchesDate;
+    });
+    
+    const totalCountEl = document.getElementById('totalCount');
+    if (filteredData.length === allData.length) {
+        totalCountEl.innerText = "Toplam Hayvan Sayısı: " + allData.length;
+    } else {
+        totalCountEl.innerText = `Toplam Hayvan Sayısı: ${allData.length} (Eşleşen: ${filteredData.length})`;
+    }
+    
+    currentPage = 1;
+    renderTable();
+    renderPagination();
+};
+
+window.clearSearch = function () {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('filterCinsiyet').value = '';
+    document.getElementById('filterIrk').value = '';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    
+    applyFilter();
+    
+    document.getElementById('searchInput').focus();
+};

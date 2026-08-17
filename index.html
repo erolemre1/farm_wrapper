@@ -149,32 +149,70 @@
         </div>
 
         <!-- 3. BÖLÜM: HAYVAN LİSTESİ VE ARAMA -->
-        <div id="listView" class="view-section">
-            <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
-            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya hayvan cinsine göre ara..." onkeyup="applyFilter()">
-            
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Sırası</th>
-                            <th>Küpe No</th>
-                            <th>Lakap</th>
-                            <th>Cinsiyet</th>
-                            <th>Irk</th>
-                            <th>Doğum Tarihi</th>
-                            <th>Koğuştuğu Tarih</th>
-                            <th>Anne Küpe No</th>
-                            <th>Hayvan Resmi</th>
-                            <th>Anne Resmi</th>
-                            <th>İşlemler</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody"></tbody>
-                </table>
-            </div>
-            <div id="pagination" class="pagination"></div>
+<div id="listView" class="view-section">
+    <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
+    
+<div class="search-filter-container">
+    <!-- Arama Kutusu ve Temizleme Butonu -->
+    <div class="search-wrapper">
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya lakaba göre ara..." onkeyup="applyFilter()">
+        <button id="clearSearchBtn" onclick="clearSearch()" title="Aramayı Temizle">&times;</button>
+    </div>
+    
+    <!-- Cinsiyet ve Irk Filtreleri -->
+    <div class="filters-wrapper">
+        <select id="filterCinsiyet" onchange="applyFilter()">
+            <option value="">Tüm Cinsiyetler</option>
+            <option value="Erkek">Erkek</option>
+            <option value="Dişi">Dişi</option>
+        </select>
+        
+        <select id="filterIrk" onchange="applyFilter()">
+            <option value="">Tüm Irklar</option>
+            <option value="simental">Simental</option>
+            <option value="hollanda">Hollanda</option>
+            <option value="simental-kırma">Simental Kırma</option>
+            <option value="hollanda-kırma">Hollanda Kırma</option>
+            <option value="montofon">Montofon</option>
+            <option value="boz">Boz</option>
+        </select>
+    </div>
+
+    <!-- YENİ: Tarih Filtreleri -->
+    <div class="date-filters-wrapper">
+        <div class="date-input-group">
+            <label for="startDate">Bu Tarihten Sonra Doğum:</label>
+            <input type="date" id="startDate" onchange="applyFilter()">
         </div>
+        <div class="date-input-group">
+            <label for="endDate">Bu Tarihten Önce Doğum:</label>
+            <input type="date" id="endDate" onchange="applyFilter()">
+        </div>
+    </div>
+</div>
+    
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Sırası</th>
+                    <th>Küpe No</th>
+                    <th>Lakap</th>
+                    <th>Cinsiyet</th>
+                    <th>Irk</th>
+                    <th>Doğum Tarihi</th>
+                    <th>Koğuştuğu Tarih</th>
+                    <th>Anne Küpe No</th>
+                    <th>Hayvan Resmi</th>
+                    <th>Anne Resmi</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    <div id="pagination" class="pagination"></div>
+</div>
 
         <!-- 4. BÖLÜM: AKTARIM VE YEDEKLEME -->
         <div id="syncView" class="view-section">
