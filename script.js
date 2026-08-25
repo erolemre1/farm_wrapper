@@ -217,11 +217,12 @@ window.applyFilter = function () {
 };
 
 function renderTable() {
-    const tbody = document.getElementById('tableBody');
-    tbody.innerHTML = "";
+    // Artık tablo tbody yerine, kartları koyacağımız div'i seçiyoruz
+    const container = document.getElementById('cardContainer');
+    container.innerHTML = "";
 
     if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #666; font-style: italic;">Aradığınız kriterlere uygun kayıt bulunamadı.</td></tr>`;
+        container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #666; font-style: italic; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Aradığınız kriterlere uygun hayvan bulunamadı.</div>`;
         return;
     }
 
@@ -230,26 +231,41 @@ function renderTable() {
     const pageData = filteredData.slice(startIndex, endIndex);
 
     pageData.forEach((row, index) => {
-        const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
-        const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="table-img" onclick="openModal(this.src)">` : '<span style="color:#999; font-size:0.8rem;">Yok</span>';
+        // Resim varsa göster, yoksa gri "Fotoğraf Yok" kutusu oluştur
+        const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
+        const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
 
-        tbody.innerHTML += `
-            <tr>
-                <td><strong>${startIndex + index + 1}</strong></td>
-                <td>${row.kupeNo}</td>
-                <td>${row.hayvanLakabi || '-'}</td>
-                <td>${row.cinsiyet}</td>
-                <td>${row.hayvanCinsi}</td>
-                <td>${row.dogumTarihi}</td>
-                <td>${row.kogustuguTarih}</td>
-                <td>${row.anneKupeNo || '-'}</td>
-                <td>${hayvanResmiHtml}</td>
-                <td>${anneResmiHtml}</td>
-                <td>
-                    <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>Düzenle</button>
-                    <button class="btn-danger" onclick="deleteData(${row.id})">Sil</button>
-                </td>
-            </tr>
+        // Kart şablonu
+        container.innerHTML += `
+            <div class="animal-card">
+                <div class="card-header">
+                    <h3>Küpe: ${row.kupeNo}</h3>
+                    <span class="card-badge">#${startIndex + index + 1}</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-info-row"><strong>Lakap:</strong> <span>${row.hayvanLakabi || '-'}</span></div>
+                    <div class="card-info-row"><strong>Cinsiyet:</strong> <span>${row.cinsiyet}</span></div>
+                    <div class="card-info-row"><strong>Irk:</strong> <span>${row.hayvanCinsi}</span></div>
+                    <div class="card-info-row"><strong>Doğum Tarihi:</strong> <span>${row.dogumTarihi || '-'}</span></div>
+                    <div class="card-info-row"><strong>Koğuştuğu Tarih:</strong> <span>${row.kogustuguTarih || '-'}</span></div>
+                    <div class="card-info-row"><strong>Anne Küpe No:</strong> <span>${row.anneKupeNo || '-'}</span></div>
+                    
+                    <div class="card-images">
+                        <div class="card-img-box">
+                            <p>Hayvan Resmi</p>
+                            ${hayvanResmiHtml}
+                        </div>
+                        <div class="card-img-box">
+                            <p>Anne Resmi</p>
+                            ${anneResmiHtml}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>✏️ Düzenle</button>
+                    <button class="btn-danger" onclick="deleteData(${row.id})">🗑️ Sil</button>
+                </div>
+            </div>
         `;
     });
 }
