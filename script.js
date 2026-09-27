@@ -657,11 +657,10 @@ if ('serviceWorker' in navigator) {
                             title: 'Yeni Sürüm Mevcut!', 
                             text: '🚀 Uygulamanın yeni bir sürümü yayınlandı! Şimdi güncellemek ister misiniz?',
                             icon: 'info', 
-                            showCancelButton: true, 
+                            showCancelButton: false, 
                             allowOutsideClick: false, 
                             allowEscapeKey: false,
                             confirmButtonText: 'Evet, Güncelle', 
-                            cancelButtonText: 'Daha Sonra', 
                             confirmButtonColor: '#28a745', 
                             cancelButtonColor: '#6c757d',
                             didClose: () => { updatePromptShown = false; }
