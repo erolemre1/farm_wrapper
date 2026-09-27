@@ -1,5 +1,16 @@
 const hashed_data = "96a8f45187e9360673b36d3b6fa2dedccae4a05522241b80e8632a41ef4d1be2";
 
+const viewRoutes = {
+    homeView: 'home',
+    addView: 'add-animal',
+    listView: 'animals',
+    syncView: 'sync'
+};
+
+const routeViews = Object.fromEntries(
+    Object.entries(viewRoutes).map(([viewId, route]) => [route, viewId])
+);
+
 if (sessionStorage.getItem("loggedIn") === "true") {
     showApp();
 }
@@ -28,7 +39,7 @@ function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('bottomNav').style.display = 'flex'; // Navigasyonu aç
-    history.replaceState({ appView: 'homeView' }, '');
+    history.replaceState({ appView: 'homeView' }, '', `${window.location.pathname}${window.location.search}#home`);
     switchView('homeView', false); // Uygulama açılırken Ana Sayfayı göster
 }
 
@@ -41,8 +52,11 @@ function handleEnter(e) {
 // YENİ: Ekranlar Arası Geçiş Fonksiyonu
 // YENİ: Ekranlar Arası Geçiş Fonksiyonu
 function switchView(viewId, updateHistory = true) {
-    if (updateHistory && history.state?.appView !== viewId) {
-        history.pushState({ appView: viewId }, '');
+    const route = viewRoutes[viewId];
+    if (!route) return;
+
+    if (updateHistory && window.location.hash !== `#${route}`) {
+        history.pushState({ appView: viewId }, '', `#${route}`);
     }
 
     // 1. Tüm sayfaları gizle
@@ -66,8 +80,8 @@ function switchView(viewId, updateHistory = true) {
 }
 
 window.addEventListener('popstate', (event) => {
-    const viewId = event.state?.appView;
-    switchView(document.getElementById(viewId) ? viewId : 'homeView', false);
+    const viewId = routeViews[window.location.hash.slice(1)] || event.state?.appView || 'homeView';
+    switchView(viewId, false);
 });
 
 let db;
