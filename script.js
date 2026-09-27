@@ -39,8 +39,10 @@ function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('bottomNav').style.display = 'flex'; // Navigasyonu aç
-    history.replaceState({ appView: 'homeView' }, '', `${window.location.pathname}${window.location.search}#home`);
-    switchView('homeView', false); // Uygulama açılırken Ana Sayfayı göster
+    const initialView = routeViews[window.location.hash.slice(1)] || 'homeView';
+    const initialRoute = viewRoutes[initialView];
+    history.replaceState({ appView: initialView }, '', `${window.location.pathname}${window.location.search}#${initialRoute}`);
+    switchView(initialView, false);
 }
 
 function handleEnter(e) {
