@@ -28,7 +28,8 @@ function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('bottomNav').style.display = 'flex'; // Navigasyonu aç
-    switchView('homeView'); // Uygulama açılırken Ana Sayfayı göster
+    history.replaceState({ appView: 'homeView' }, '');
+    switchView('homeView', false); // Uygulama açılırken Ana Sayfayı göster
 }
 
 function handleEnter(e) {
@@ -39,7 +40,11 @@ function handleEnter(e) {
 
 // YENİ: Ekranlar Arası Geçiş Fonksiyonu
 // YENİ: Ekranlar Arası Geçiş Fonksiyonu
-function switchView(viewId) {
+function switchView(viewId, updateHistory = true) {
+    if (updateHistory && history.state?.appView !== viewId) {
+        history.pushState({ appView: viewId }, '');
+    }
+
     // 1. Tüm sayfaları gizle
     document.querySelectorAll('.view-section').forEach(el => {
         el.style.display = 'none';
@@ -59,6 +64,11 @@ function switchView(viewId) {
     // 4. Sayfayı en üste kaydır
     window.scrollTo(0, 0);
 }
+
+window.addEventListener('popstate', (event) => {
+    const viewId = event.state?.appView;
+    switchView(document.getElementById(viewId) ? viewId : 'homeView', false);
+});
 
 let db;
 let base64Hayvan = "";
