@@ -194,7 +194,16 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
     };
 
     const editId = document.getElementById('editId').value;
-    if (editId) data.id = Number(editId);
+    if (editId) {
+        data.id = Number(editId);
+        const existingRecord = allData.find(row => row.id === data.id);
+        if (existingRecord) {
+            data.herdStatus = existingRecord.herdStatus || 'active';
+            data.exitReason = existingRecord.exitReason || '';
+            data.exitDate = existingRecord.exitDate || '';
+            data.salePrice = existingRecord.salePrice ?? null;
+        }
+    }
 
     const tx = db.transaction("kayitlar", "readwrite");
     const store = tx.objectStore("kayitlar");
@@ -224,7 +233,8 @@ function loadData() {
 
     request.onsuccess = () => {
         allData = request.result.sort((a, b) => a.id - b.id);
-        document.getElementById('totalCount').innerText = "Toplam Hayvan Sayısı: " + allData.length;
+        const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
+        document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
         applyFilter();
     };
 }
@@ -260,6 +270,16 @@ function renderTable() {
         // Resim varsa göster, yoksa gri "Fotoğraf Yok" kutusu oluştur
         const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
         const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
+        const isActive = !row.herdStatus || row.herdStatus === 'active';
+        const exitLabels = { sold: 'Satıldı', dead: 'Öldü', transferred: 'Başka işletmeye geçti' };
+        const exitDetailsHtml = isActive ? '' : `
+            <div class="card-info-row"><strong>Durum:</strong> <span>${exitLabels[row.herdStatus] || 'Sürüden çıktı'}</span></div>
+            <div class="card-info-row"><strong>Çıkış Tarihi:</strong> <span>${row.exitDate || '-'}</span></div>
+            ${row.herdStatus === 'sold' ? `<div class="card-info-row"><strong>Satış Fiyatı:</strong> <span>${Number(row.salePrice || 0).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</span></div>` : ''}
+        `;
+        const herdActionHtml = isActive
+            ? `<button class="btn-warning" onclick="markAnimalExited(${row.id})">Sürüden Çıkar</button>`
+            : `<button class="btn-success" onclick="restoreAnimalToHerd(${row.id})">Sürüye Geri Al</button>`;
 
         // Kart şablonu
         container.innerHTML += `
@@ -275,6 +295,7 @@ function renderTable() {
                     <div class="card-info-row"><strong>Doğum Tarihi:</strong> <span>${row.dogumTarihi || '-'}</span></div>
                     <div class="card-info-row"><strong>Koğuştuğu Tarih:</strong> <span>${row.kogustuguTarih || '-'}</span></div>
                     <div class="card-info-row"><strong>Anne Küpe No:</strong> <span>${row.anneKupeNo || '-'}</span></div>
+                    ${exitDetailsHtml}
                     
                     <div class="card-images">
                         <div class="card-img-box">
@@ -289,7 +310,8 @@ function renderTable() {
                 </div>
                 <div class="card-footer">
                     <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>✏️ Düzenle</button>
-                    <button class="btn-danger" onclick="deleteData(${row.id})">🗑️ Sil</button>
+                    ${herdActionHtml}
+                    <button class="btn-danger" onclick="deleteData(${row.id})">Kalıcı Sil</button>
                 </div>
             </div>
         `;
@@ -405,6 +427,106 @@ window.deleteData = function (id) {
                 });
             };
         }
+    });
+};
+
+window.markAnimalExited = function (id) {
+    const animal = allData.find(row => row.id === id);
+    if (!animal) return;
+
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    Swal.fire({
+        title: `Sürüden çıkar: ${animal.kupeNo}`,
+        html: `
+            <label for="exitReason">Çıkış nedeni</label>
+            <select id="exitReason" class="swal2-select">
+                <option value="sold">Satıldı</option>
+                <option value="dead">Öldü</option>
+                <option value="transferred">Başka işletmeye geçti</option>
+            </select>
+            <label for="exitDate">Çıkış tarihi</label>
+            <input id="exitDate" class="swal2-input" type="date" value="${today}">
+            <div id="salePriceField">
+                <label for="salePrice">Satış fiyatı (TL)</label>
+                <input id="salePrice" class="swal2-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Örn. 85000">
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Kaydet',
+        cancelButtonText: 'İptal',
+        confirmButtonColor: '#28a745',
+        didOpen: () => {
+            const reasonSelect = document.getElementById('exitReason');
+            const salePriceField = document.getElementById('salePriceField');
+            const updateSalePriceVisibility = () => {
+                salePriceField.style.display = reasonSelect.value === 'sold' ? 'block' : 'none';
+            };
+            reasonSelect.addEventListener('change', updateSalePriceVisibility);
+            updateSalePriceVisibility();
+        },
+        preConfirm: () => {
+            const exitReason = document.getElementById('exitReason').value;
+            const exitDate = document.getElementById('exitDate').value;
+            const rawPrice = document.getElementById('salePrice').value.trim();
+            const salePrice = Number(rawPrice);
+
+            if (!exitDate) {
+                Swal.showValidationMessage('Çıkış tarihini girin.');
+                return false;
+            }
+            if (exitReason === 'sold' && (!rawPrice || !Number.isFinite(salePrice) || salePrice < 0)) {
+                Swal.showValidationMessage('Satış fiyatını TL olarak girin.');
+                return false;
+            }
+
+            return { exitReason, exitDate, salePrice: exitReason === 'sold' ? salePrice : null };
+        }
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        const updatedAnimal = {
+            ...animal,
+            herdStatus: result.value.exitReason,
+            exitReason: result.value.exitReason,
+            exitDate: result.value.exitDate,
+            salePrice: result.value.salePrice
+        };
+        const tx = db.transaction('kayitlar', 'readwrite');
+        tx.objectStore('kayitlar').put(updatedAnimal);
+        tx.oncomplete = () => {
+            loadData();
+            Swal.fire({
+                title: 'Kayıt güncellendi',
+                text: result.value.exitReason === 'sold'
+                    ? `Satış fiyatı: ${result.value.salePrice.toLocaleString('tr-TR')} TL`
+                    : 'Hayvan sürüden çıkarıldı.',
+                icon: 'success',
+                confirmButtonText: 'Tamam'
+            });
+        };
+    });
+};
+
+window.restoreAnimalToHerd = function (id) {
+    const animal = allData.find(row => row.id === id);
+    if (!animal) return;
+
+    Swal.fire({
+        title: 'Hayvanı sürüye geri al?',
+        text: `Küpe numarası: ${animal.kupeNo}`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Geri Al',
+        cancelButtonText: 'İptal'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        const restoredAnimal = { ...animal, herdStatus: 'active', exitReason: '', exitDate: '', salePrice: null };
+        const tx = db.transaction('kayitlar', 'readwrite');
+        tx.objectStore('kayitlar').put(restoredAnimal);
+        tx.oncomplete = loadData;
     });
 };
 
@@ -700,6 +822,7 @@ window.applyFilter = function () {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const filterCinsiyet = document.getElementById('filterCinsiyet').value;
     const filterIrk = document.getElementById('filterIrk').value;
+    const filterHerdStatus = document.getElementById('filterHerdStatus').value;
     
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
@@ -710,6 +833,10 @@ window.applyFilter = function () {
         const matchesSearch = kupe.includes(searchTerm) || lakap.includes(searchTerm);
         const matchesCinsiyet = filterCinsiyet === "" || row.cinsiyet === filterCinsiyet;
         const matchesIrk = filterIrk === "" || row.hayvanCinsi === filterIrk;
+        const isActive = !row.herdStatus || row.herdStatus === 'active';
+        const matchesHerdStatus = filterHerdStatus === 'all' ||
+            (filterHerdStatus === 'active' && isActive) ||
+            (filterHerdStatus === 'exited' && !isActive);
 
         let matchesDate = true;
         if (startDate || endDate) {
@@ -721,15 +848,12 @@ window.applyFilter = function () {
             }
         }
 
-        return matchesSearch && matchesCinsiyet && matchesIrk && matchesDate;
+        return matchesSearch && matchesCinsiyet && matchesIrk && matchesDate && matchesHerdStatus;
     });
     
     const totalCountEl = document.getElementById('totalCount');
-    if (filteredData.length === allData.length) {
-        totalCountEl.innerText = "Toplam Hayvan Sayısı: " + allData.length;
-    } else {
-        totalCountEl.innerText = `Toplam Hayvan Sayısı: ${allData.length} (Eşleşen: ${filteredData.length})`;
-    }
+    const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
+    totalCountEl.innerText = `Sürüde: ${activeCount} | Gösterilen: ${filteredData.length}`;
     
     currentPage = 1;
     renderTable();
@@ -740,6 +864,7 @@ window.clearSearch = function () {
     document.getElementById('searchInput').value = '';
     document.getElementById('filterCinsiyet').value = '';
     document.getElementById('filterIrk').value = '';
+    document.getElementById('filterHerdStatus').value = 'active';
     document.getElementById('startDate').value = '';
     document.getElementById('endDate').value = '';
     
