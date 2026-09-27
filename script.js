@@ -441,16 +441,16 @@ window.markAnimalExited = function (id) {
         title: `Sürüden çıkar: ${animal.kupeNo}`,
         html: `
             <label for="exitReason">Çıkış nedeni</label>
-            <select id="exitReason" class="swal2-select">
+            <select id="exitReason">
                 <option value="sold">Satıldı</option>
                 <option value="dead">Öldü</option>
                 <option value="transferred">Başka işletmeye geçti</option>
             </select>
             <label for="exitDate">Çıkış tarihi</label>
-            <input id="exitDate" class="swal2-input" type="date" value="${today}">
+            <input id="exitDate"  type="date" value="${today}">
             <div id="salePriceField">
                 <label for="salePrice">Satış fiyatı (TL)</label>
-                <input id="salePrice" class="swal2-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Örn. 85000">
+                <input id="salePrice"  type="number" min="0" step="0.01" inputmode="decimal" placeholder="Örn. 85000">
             </div>
         `,
         showCancelButton: true,
