@@ -18,6 +18,9 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
+            .btn-info {
+                height: 35px;
+            }
         }
 
         @media (max-width: 600px) {
@@ -81,8 +84,8 @@
             background: #17a2b8;
             padding: 0.3rem 0.6rem;
             font-size: 0.8rem;
-            height: 35px;
         }
+
 
         .preview-container {
             position: relative;
@@ -476,6 +479,7 @@
             border-radius: 4px;
             background-color: white;
             cursor: pointer;
+            padding-left: 0;
         }
 
         @media (min-width: 768px) {
