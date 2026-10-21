@@ -178,13 +178,6 @@ window.removeImage = function (type) {
 };
 
 document.getElementById('animalForm').addEventListener('submit', (e) => {
-  if ("vibrate" in navigator) {
-    navigator.vibrate(3000); 
-    alert("titreşim başladı");
-
-} else {
-    alert("Bu cihaz veya tarayıcı titreşim özelliğini desteklemiyor.");
-}
     e.preventDefault();
     const data = {
         kupeNo: document.getElementById('kupeNo').value,
@@ -231,6 +224,16 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             switchView('listView');
         });
     };
+
+
+    /// tireşim
+    
+    if ("vibrate" in navigator) {
+    navigator.vibrate(500); 
+
+    } else {
+        alert("Bu cihaz veya tarayıcı titreşim özelliğini desteklemiyor.");
+    }
 });
 
 function loadData() {
