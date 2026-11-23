@@ -301,7 +301,10 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         anneResmi: base64Anne,
         isMilking: isMilkingVal,
         milkRecords: [],
-        healthRecords: []
+        healthRecords: [],
+        weightRecords: [],
+        tags: [],
+        notes: ''
     };
 
     const editId = document.getElementById('editId').value;
@@ -317,6 +320,9 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             data.salePrice = existingRecord.salePrice ?? null;
             data.milkRecords = Array.isArray(existingRecord.milkRecords) ? existingRecord.milkRecords : [];
             data.healthRecords = Array.isArray(existingRecord.healthRecords) ? existingRecord.healthRecords : [];
+            data.weightRecords = Array.isArray(existingRecord.weightRecords) ? existingRecord.weightRecords : [];
+            data.tags = Array.isArray(existingRecord.tags) ? existingRecord.tags : [];
+            data.notes = existingRecord.notes || '';
         }
     }
 
@@ -531,6 +537,36 @@ function formatHealthCountdown(daysUntil) {
     return `${Math.abs(daysUntil)} gün gecikti`;
 }
 
+const PRESET_ANIMAL_TAGS = ['Huysuz', 'Sakin', 'Besi', 'İlk Buzağısı', 'Yüksek Verimli', 'Özel Takip'];
+
+function getAnimalTags(row) {
+    if (!row || !Array.isArray(row.tags)) return [];
+    return row.tags.map(t => String(t || '').trim()).filter(Boolean);
+}
+
+function getWeightRecords(row) {
+    if (!row || !Array.isArray(row.weightRecords)) return [];
+    return [...row.weightRecords].sort((a, b) => {
+        const cmp = String(b.date || '').localeCompare(String(a.date || ''));
+        if (cmp !== 0) return cmp;
+        return String(b.id || '').localeCompare(String(a.id || ''));
+    });
+}
+
+function getAnimalLatestMilkScore(row) {
+    if (!row || row.cinsiyet !== 'Dişi') return -1;
+    const records = getMilkRecords(row);
+    if (!records.length) return -1;
+    const recent = records.slice(0, 7);
+    const total = recent.reduce((sum, r) => sum + (Number(r.morning) || 0) + (Number(r.evening) || 0), 0);
+    return total / recent.length;
+}
+
+function getAnimalLatestWeight(row) {
+    const records = getWeightRecords(row);
+    return records.length ? (Number(records[0].weight) || 0) : -1;
+}
+
 function getMilkRecords(row) {
     if (!row || !Array.isArray(row.milkRecords)) return [];
     return [...row.milkRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -723,6 +759,15 @@ function renderTable() {
         const latestMilkHtml = latestMilk
             ? `<div class="card-info-row"><strong>Son Süt (${formatDateTR(latestMilk.date)}):</strong> <span>${formatLiters((Number(latestMilk.morning) || 0) + (Number(latestMilk.evening) || 0))} L</span></div>`
             : '';
+        const weightRecords = getWeightRecords(row);
+        const latestWeight = weightRecords[0] || null;
+        const latestWeightHtml = latestWeight
+            ? `<div class="card-info-row"><strong>Son Ağırlık (${formatDateTR(latestWeight.date)}):</strong> <span>${formatLiters(latestWeight.weight)} kg</span></div>`
+            : '';
+        const animalTags = getAnimalTags(row);
+        const tagsHtml = animalTags.length
+            ? `<div class="card-tags-row">${animalTags.map(tag => `<span class="animal-tag-chip">#${escapeHtml(tag)}</span>`).join('')}</div>`
+            : '';
         const exitDetailsHtml = isActive ? '' : `
             <div class="card-info-row"><strong>Durum:</strong> <span>${exitLabels[row.herdStatus] || 'Sürüden çıktı'}</span></div>
             <div class="card-info-row"><strong>Çıkış Tarihi:</strong> <span>${row.exitDate || '-'}</span></div>
@@ -745,6 +790,7 @@ function renderTable() {
                     </div>
                 </div>
                 <div class="card-body">
+                    ${tagsHtml}
                     <div class="card-info-row"><strong>Lakap:</strong> <span>${escapeHtml(row.hayvanLakabi || '-')}</span></div>
                     <div class="card-info-row"><strong>Cinsiyet:</strong> <span>${escapeHtml(row.cinsiyet)}</span></div>
                     <div class="card-info-row"><strong>Irk:</strong> <span>${escapeHtml(row.hayvanCinsi)}</span></div>
@@ -754,6 +800,7 @@ function renderTable() {
                     ${calvingRowHtml}
                     <div class="card-info-row"><strong>Anne Küpe No:</strong> <span>${escapeHtml(row.anneKupeNo || '-')}</span></div>
                     ${latestMilkHtml}
+                    ${latestWeightHtml}
                     ${exitDetailsHtml}
                     
                     <div class="card-images">
@@ -1203,6 +1250,133 @@ function renderAnimalDetail(id) {
         </div>
     `;
 
+    const animalTags = getAnimalTags(animal);
+    const weightRecords = getWeightRecords(animal);
+    const latestWeightRec = weightRecords[0] || null;
+    const earliestWeightRec = weightRecords.length > 1 ? weightRecords[weightRecords.length - 1] : null;
+    let totalWeightGain = null;
+    let dailyAvgGain = null;
+    if (latestWeightRec && earliestWeightRec) {
+        totalWeightGain = (Number(latestWeightRec.weight) || 0) - (Number(earliestWeightRec.weight) || 0);
+        const spanDays = diffDaysBetweenDateStr(earliestWeightRec.date, latestWeightRec.date);
+        if (spanDays && spanDays > 0) {
+            dailyAvgGain = totalWeightGain / spanDays;
+        }
+    }
+
+    const weightHistoryHtml = weightRecords.length === 0
+        ? '<div class="milk-empty-state">Henüz canlı ağırlık (kilo) ölçümü girilmedi.</div>'
+        : `<div class="milk-history-list">${weightRecords.map((rec, idx) => {
+            const prevRec = weightRecords[idx + 1] || null;
+            let diffBadgeHtml = '';
+            if (prevRec) {
+                const deltaKg = (Number(rec.weight) || 0) - (Number(prevRec.weight) || 0);
+                const span = diffDaysBetweenDateStr(prevRec.date, rec.date);
+                const sign = deltaKg > 0 ? '+' : '';
+                const gcaaPart = span && span > 0 ? ` · ${sign}${formatLiters(deltaKg / span)} kg/gün` : '';
+                diffBadgeHtml = `<span class="weight-gain-badge ${deltaKg < 0 ? 'negative' : ''}">${sign}${formatLiters(deltaKg)} kg${gcaaPart}</span>`;
+            }
+            const safeWId = escapeHtml(rec.id);
+            return `
+                <div class="milk-history-item">
+                    <div class="milk-history-main">
+                        <span class="milk-history-date">📅 ${formatDateTR(rec.date)} — <strong>${formatLiters(rec.weight)} kg</strong> ${diffBadgeHtml}</span>
+                        ${rec.note ? `<div class="milk-history-values"><span>${escapeHtml(rec.note)}</span></div>` : ''}
+                    </div>
+                    <div class="milk-history-actions">
+                        <button type="button" class="btn-info" onclick="editWeightRecord(${animal.id}, '${safeWId}')" title="Düzenle">✏️</button>
+                        <button type="button" class="btn-danger" onclick="deleteWeightRecord(${animal.id}, '${safeWId}')" title="Sil">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('')}</div>`;
+
+    const weightSectionHtml = `
+        <div class="card">
+            <div class="milk-section-header">
+                <h3>⚖️ Canlı Ağırlık Takibi</h3>
+            </div>
+            <form id="weightEntryForm" onsubmit="saveWeightRecord(event, ${animal.id})">
+                <input type="hidden" id="weightRecordEditId" value="">
+                <div class="weight-form-grid">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="weightDate">Ölçüm Tarihi</label>
+                        <input type="date" id="weightDate" value="${todayForHealth}" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="weightValue">Canlı Ağırlık (kg)</label>
+                        <input type="number" id="weightValue" min="1" step="0.5" inputmode="decimal" placeholder="Örn. 485" required>
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="weightNote">Kısa Not (İsteğe Bağlı)</label>
+                        <input type="text" id="weightNote" placeholder="Örn. Kantar ölçümü, besi başlangıcı...">
+                    </div>
+                </div>
+                <div class="health-form-actions">
+                    <button type="submit" id="weightSubmitBtn" class="btn-primary" style="flex: 1;">💾 Ağırlık Kaydını Kaydet</button>
+                    <button type="button" id="weightCancelEditBtn" class="btn-secondary" style="display: none;" onclick="resetWeightForm()">İptal</button>
+                </div>
+            </form>
+
+            ${weightRecords.length > 0 ? `
+                <div class="milk-stats-grid">
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Son Ağırlık</span>
+                        <span class="milk-stat-value">${formatLiters(latestWeightRec.weight)} kg</span>
+                        <span class="home-milk-metric-sub">${formatDateTR(latestWeightRec.date)}</span>
+                    </div>
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Toplam Artış</span>
+                        <span class="milk-stat-value">${totalWeightGain !== null ? `${totalWeightGain > 0 ? '+' : ''}${formatLiters(totalWeightGain)} kg` : '-'}</span>
+                    </div>
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Günlük Artış (GCAA)</span>
+                        <span class="milk-stat-value">${dailyAvgGain !== null ? `${dailyAvgGain > 0 ? '+' : ''}${formatLiters(dailyAvgGain)} kg/gün` : '-'}</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            <h4 class="milk-history-title">Ağırlık Geçmişi</h4>
+            ${weightHistoryHtml}
+        </div>
+    `;
+
+    const notesSectionHtml = `
+        <div class="card">
+            <div class="milk-section-header">
+                <h3>📝 Notlar & Özel Etiketler</h3>
+            </div>
+            <div class="tag-presets">
+                ${PRESET_ANIMAL_TAGS.map(preset => {
+                    const isSelected = animalTags.some(t => t.toLowerCase() === preset.toLowerCase());
+                    return `<button type="button" class="tag-preset-btn ${isSelected ? 'selected' : ''}" data-tag="${escapeHtml(preset)}" onclick="toggleAnimalTag(${animal.id}, this.dataset.tag)">${isSelected ? '✓ ' : '+ '}${escapeHtml(preset)}</button>`;
+                }).join('')}
+            </div>
+
+            <form class="tag-input-row" onsubmit="addCustomAnimalTag(event, ${animal.id})">
+                <input type="text" id="customTagInput" placeholder="Özel etiket ekle (örn. 1. Ahır, Satılık)...">
+                <button type="submit" class="btn-info">+ Etiket Ekle</button>
+            </form>
+
+            ${animalTags.length > 0 ? `
+                <div class="card-tags-row" style="margin-bottom: 1rem;">
+                    ${animalTags.map(tag => `
+                        <span class="animal-tag-chip">
+                            #${escapeHtml(tag)}
+                            <button type="button" class="animal-tag-remove" data-tag="${escapeHtml(tag)}" onclick="toggleAnimalTag(${animal.id}, this.dataset.tag)" title="Etiketi kaldır">&times;</button>
+                        </span>
+                    `).join('')}
+                </div>
+            ` : ''}
+
+            <form onsubmit="saveAnimalNotes(event, ${animal.id})">
+                <label for="detailAnimalNotes">Hayvan Notu</label>
+                <textarea id="detailAnimalNotes" class="notes-textarea" placeholder="Ayak bakımı, huyu, yem tüketimi veya özel hatırlatmalar...">${escapeHtml(animal.notes || '')}</textarea>
+                <button type="submit" class="btn-primary">💾 Notu Kaydet</button>
+            </form>
+        </div>
+    `;
+
     container.innerHTML = `
         <div class="card">
             <div class="detail-header">
@@ -1216,6 +1390,8 @@ function renderAnimalDetail(id) {
                     ${statusBadge}
                 </div>
             </div>
+
+            ${animalTags.length > 0 ? `<div class="card-tags-row" style="margin-bottom: 1rem;">${animalTags.map(tag => `<span class="animal-tag-chip">#${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
 
             <div class="detail-info-grid">
                 <div class="detail-info-item">
@@ -1266,12 +1442,160 @@ function renderAnimalDetail(id) {
                 <button class="btn-danger" onclick="deleteData(${animal.id})">Kalıcı Sil</button>
             </div>
         </div>
+        ${notesSectionHtml}
+        ${weightSectionHtml}
         ${reproductionSectionHtml}
         ${healthSectionHtml}
         ${pedigreeSectionHtml}
         ${milkSectionHtml}
     `;
 }
+
+window.toggleAnimalTag = function (animalId, tagText) {
+    const animal = allDataById.get(Number(animalId));
+    const cleanTag = String(tagText || '').trim();
+    if (!animal || !cleanTag) return;
+
+    const currentTags = getAnimalTags(animal);
+    const exists = currentTags.some(t => t.toLowerCase() === cleanTag.toLowerCase());
+    const nextTags = exists
+        ? currentTags.filter(t => t.toLowerCase() !== cleanTag.toLowerCase())
+        : [...currentTags, cleanTag];
+
+    updateAnimalRecordInDB({ ...animal, tags: nextTags }, () => {
+        renderAnimalDetail(animal.id);
+    });
+};
+
+window.addCustomAnimalTag = function (event, animalId) {
+    event.preventDefault();
+    const inputEl = document.getElementById('customTagInput');
+    const rawTag = inputEl?.value.trim() || '';
+    if (!rawTag) return;
+
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+
+    const currentTags = getAnimalTags(animal);
+    if (currentTags.some(t => t.toLowerCase() === rawTag.toLowerCase())) {
+        inputEl.value = '';
+        return;
+    }
+
+    updateAnimalRecordInDB({ ...animal, tags: [...currentTags, rawTag] }, () => {
+        renderAnimalDetail(animal.id);
+    });
+};
+
+window.saveAnimalNotes = function (event, animalId) {
+    event.preventDefault();
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+
+    const notesVal = document.getElementById('detailAnimalNotes')?.value.trim() || '';
+    updateAnimalRecordInDB({ ...animal, notes: notesVal }, () => {
+        Swal.fire({
+            title: 'Kaydedildi!',
+            text: 'Hayvan notu güncellendi.',
+            icon: 'success',
+            timer: 1300,
+            showConfirmButton: false
+        });
+    });
+};
+
+window.resetWeightForm = function () {
+    const form = document.getElementById('weightEntryForm');
+    if (form) form.reset();
+    const editIdEl = document.getElementById('weightRecordEditId');
+    const dateEl = document.getElementById('weightDate');
+    const submitBtn = document.getElementById('weightSubmitBtn');
+    const cancelBtn = document.getElementById('weightCancelEditBtn');
+    if (editIdEl) editIdEl.value = '';
+    if (dateEl) dateEl.value = getTodayDateString();
+    if (submitBtn) submitBtn.innerText = '💾 Ağırlık Kaydını Kaydet';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+};
+
+window.saveWeightRecord = function (event, animalId) {
+    event.preventDefault();
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+
+    const editRecId = document.getElementById('weightRecordEditId')?.value || '';
+    const date = document.getElementById('weightDate')?.value || '';
+    const rawWeight = document.getElementById('weightValue')?.value.trim() || '';
+    const note = document.getElementById('weightNote')?.value.trim() || '';
+    const weight = Number(rawWeight);
+
+    if (!date || !rawWeight || !Number.isFinite(weight) || weight <= 0) {
+        Swal.fire({ title: 'Uyarı', text: 'Lütfen geçerli bir tarih ve ağırlık (kg) girin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const recordObj = {
+        id: editRecId || `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date,
+        weight,
+        note
+    };
+
+    const existing = getWeightRecords(animal).filter(r => r.id !== recordObj.id);
+    existing.push(recordObj);
+    existing.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+    updateAnimalRecordInDB({ ...animal, weightRecords: existing }, () => {
+        renderAnimalDetail(animal.id);
+        Swal.fire({
+            title: editRecId ? 'Güncellendi!' : 'Kaydedildi!',
+            text: `${formatDateTR(date)} — ${formatLiters(weight)} kg kaydedildi.`,
+            icon: 'success',
+            timer: 1400,
+            showConfirmButton: false
+        });
+    });
+};
+
+window.editWeightRecord = function (animalId, recordId) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+    const rec = getWeightRecords(animal).find(r => r.id === recordId);
+    if (!rec) return;
+
+    document.getElementById('weightRecordEditId').value = rec.id;
+    document.getElementById('weightDate').value = rec.date || getTodayDateString();
+    document.getElementById('weightValue').value = rec.weight;
+    document.getElementById('weightNote').value = rec.note || '';
+    document.getElementById('weightSubmitBtn').innerText = '💾 Ağırlığı Güncelle';
+    document.getElementById('weightCancelEditBtn').style.display = 'inline-block';
+
+    const formEl = document.getElementById('weightEntryForm');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+window.deleteWeightRecord = function (animalId, recordId) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+    const rec = getWeightRecords(animal).find(r => r.id === recordId);
+    if (!rec) return;
+
+    Swal.fire({
+        title: 'Ağırlık kaydını sil?',
+        text: `${formatDateTR(rec.date)} (${formatLiters(rec.weight)} kg) kaydı silinecek.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Evet, Sil',
+        cancelButtonText: 'İptal'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const remaining = getWeightRecords(animal).filter(r => r.id !== recordId);
+        updateAnimalRecordInDB({ ...animal, weightRecords: remaining }, () => {
+            renderAnimalDetail(animal.id);
+        });
+    });
+};
 
 function renderHomeHealthAlerts() {
     const container = document.getElementById('homeHealthAlerts');
@@ -1697,7 +2021,8 @@ window.exportAnimalsCSV = function () {
         'Küpe No', 'Lakap', 'Cinsiyet', 'Irk', 'Doğum Tarihi', 'Yaş',
         'Sürü Durumu', 'Sağılır', 'Koğuştuğu Tarih', 'Tahmini Doğum Tarihi',
         'Anne Küpe No', 'Anne Irkı', 'Çıkış Tarihi', 'Satış Fiyatı (TL)',
-        'Toplam Süt (L)', 'Toplam Sağlık Maliyeti (TL)'
+        'Toplam Süt (L)', 'Son Ağırlık (kg)', 'Toplam Sağlık Maliyeti (TL)',
+        'Etiketler', 'Notlar'
     ];
 
     const rows = allData.map(animal => {
@@ -1705,7 +2030,9 @@ window.exportAnimalsCSV = function () {
         const ageInfo = calculateAgeInfo(animal.dogumTarihi);
         const preg = getPregnancyInfo(animal);
         const totalMilk = getMilkRecords(animal).reduce((sum, r) => sum + (Number(r.morning) || 0) + (Number(r.evening) || 0), 0);
+        const latestWeight = getAnimalLatestWeight(animal);
         const totalHealthCost = getHealthRecords(animal).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+        const tagsStr = getAnimalTags(animal).join(', ');
 
         return [
             animal.kupeNo || '',
@@ -1723,7 +2050,10 @@ window.exportAnimalsCSV = function () {
             animal.exitDate ? formatDateTR(animal.exitDate) : '',
             animal.herdStatus === 'sold' ? formatLiters(animal.salePrice || 0) : '',
             totalMilk > 0 ? formatLiters(totalMilk) : '',
-            totalHealthCost > 0 ? formatLiters(totalHealthCost) : ''
+            latestWeight > 0 ? formatLiters(latestWeight) : '',
+            totalHealthCost > 0 ? formatLiters(totalHealthCost) : '',
+            tagsStr,
+            animal.notes || ''
         ];
     });
 
@@ -2938,6 +3268,7 @@ window.applyFilter = function () {
     const filterIrk = document.getElementById('filterIrk').value;
     const filterHerdStatus = document.getElementById('filterHerdStatus').value;
     const filterMilking = document.getElementById('filterMilking').value;
+    const sortOrder = document.getElementById('sortOrder')?.value || 'id-asc';
     
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
@@ -2945,7 +3276,9 @@ window.applyFilter = function () {
     filteredData = allData.filter(row => {
         const kupe = (row.kupeNo || "").toLowerCase();
         const lakap = (row.hayvanLakabi || "").toLowerCase();
-        const matchesSearch = kupe.includes(searchTerm) || lakap.includes(searchTerm);
+        const notes = (row.notes || "").toLowerCase();
+        const tagsJoined = getAnimalTags(row).join(' ').toLowerCase();
+        const matchesSearch = kupe.includes(searchTerm) || lakap.includes(searchTerm) || tagsJoined.includes(searchTerm) || notes.includes(searchTerm);
         const matchesCinsiyet = filterCinsiyet === "" || row.cinsiyet === filterCinsiyet;
         const matchesIrk = filterIrk === "" || row.hayvanCinsi === filterIrk;
         const isActive = !row.herdStatus || row.herdStatus === 'active';
@@ -2969,6 +3302,32 @@ window.applyFilter = function () {
 
         return matchesSearch && matchesCinsiyet && matchesIrk && matchesDate && matchesHerdStatus && matchesMilking;
     });
+
+    if (sortOrder === 'kupe-asc') {
+        filteredData.sort((a, b) => String(a.kupeNo || '').localeCompare(String(b.kupeNo || ''), 'tr', { numeric: true }));
+    } else if (sortOrder === 'kupe-desc') {
+        filteredData.sort((a, b) => String(b.kupeNo || '').localeCompare(String(a.kupeNo || ''), 'tr', { numeric: true }));
+    } else if (sortOrder === 'age-young') {
+        filteredData.sort((a, b) => {
+            if (!a.dogumTarihi && !b.dogumTarihi) return 0;
+            if (!a.dogumTarihi) return 1;
+            if (!b.dogumTarihi) return -1;
+            return String(b.dogumTarihi).localeCompare(String(a.dogumTarihi));
+        });
+    } else if (sortOrder === 'age-old') {
+        filteredData.sort((a, b) => {
+            if (!a.dogumTarihi && !b.dogumTarihi) return 0;
+            if (!a.dogumTarihi) return 1;
+            if (!b.dogumTarihi) return -1;
+            return String(a.dogumTarihi).localeCompare(String(b.dogumTarihi));
+        });
+    } else if (sortOrder === 'milk-desc') {
+        filteredData.sort((a, b) => getAnimalLatestMilkScore(b) - getAnimalLatestMilkScore(a));
+    } else if (sortOrder === 'weight-desc') {
+        filteredData.sort((a, b) => getAnimalLatestWeight(b) - getAnimalLatestWeight(a));
+    } else {
+        filteredData.sort((a, b) => a.id - b.id);
+    }
     
     const totalCountEl = document.getElementById('totalCount');
     const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
@@ -2984,6 +3343,8 @@ window.clearSearch = function () {
     document.getElementById('filterIrk').value = '';
     document.getElementById('filterHerdStatus').value = 'active';
     document.getElementById('filterMilking').value = '';
+    const sortEl = document.getElementById('sortOrder');
+    if (sortEl) sortEl.value = 'id-asc';
     document.getElementById('startDate').value = '';
     document.getElementById('endDate').value = '';
     

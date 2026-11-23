@@ -2018,3 +2018,148 @@
     padding: 0.68rem 1rem;
     font-size: 0.88rem;
 }
+
+/* --- LİSTE SIRALAMA, ETİKETLER, NOTLAR VE CANLI AĞIRLIK TAKİBİ --- */
+.list-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.sort-select {
+    width: auto;
+    min-width: 210px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: white;
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+}
+
+@media (max-width: 550px) {
+    .sort-select {
+        width: 100%;
+    }
+}
+
+.card-tags-row {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin: 6px 0 8px 0;
+}
+
+.animal-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #eef2ff;
+    color: #3730a3;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.animal-tag-remove {
+    background: none;
+    border: none;
+    color: #4f46e5;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.tag-presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+
+.tag-preset-btn {
+    margin: 0;
+    padding: 0.32rem 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: #f8f9fa;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    border-radius: 999px;
+}
+
+.tag-preset-btn.selected {
+    background: #4f46e5;
+    color: white;
+    border-color: #4f46e5;
+}
+
+.tag-input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 0.85rem;
+}
+
+.tag-input-row input {
+    flex: 1;
+}
+
+.tag-input-row button {
+    margin: 0;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.notes-textarea {
+    width: 100%;
+    min-height: 88px;
+    padding: 0.65rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 0.92rem;
+    resize: vertical;
+    margin-bottom: 0.7rem;
+}
+
+.weight-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 0.85rem;
+}
+
+@media (max-width: 500px) {
+    .weight-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.weight-form-grid .full-span {
+    grid-column: 1 / -1;
+}
+
+.weight-gain-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    background: #e6f4ea;
+    color: #137333;
+}
+
+.weight-gain-badge.negative {
+    background: #fce8e6;
+    color: #c5221f;
+}

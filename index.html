@@ -166,12 +166,23 @@
 
         <!-- 3. BÖLÜM: HAYVAN LİSTESİ VE ARAMA -->
 <div id="listView" class="view-section">
-    <div id="totalCount" class="total-count">Toplam Hayvan Sayısı: 0</div>
+    <div class="list-toolbar">
+        <div id="totalCount" class="total-count" style="margin-bottom: 0;">Toplam Hayvan Sayısı: 0</div>
+        <select id="sortOrder" class="sort-select" onchange="applyFilter()" aria-label="Sıralama">
+            <option value="id-asc">Sıralama: Kayıt Sırası</option>
+            <option value="kupe-asc">Küpe No (Artan)</option>
+            <option value="kupe-desc">Küpe No (Azalan)</option>
+            <option value="age-young">Yaş: En Genç → En Yaşlı</option>
+            <option value="age-old">Yaş: En Yaşlı → En Genç</option>
+            <option value="milk-desc">Süt Verimi (En Yüksek)</option>
+            <option value="weight-desc">Canlı Ağırlık (En Ağır)</option>
+        </select>
+    </div>
     
 <div class="search-filter-container">
     <!-- Arama Kutusu ve Temizleme Butonu -->
     <div class="search-wrapper">
-        <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe numarası veya lakaba göre ara..." onkeyup="applyFilter()">
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 Küpe no, lakap, etiket veya not ara..." onkeyup="applyFilter()">
         <button id="clearSearchBtn" onclick="clearSearch()" title="Aramayı Temizle">&times;</button>
     </div>
     
