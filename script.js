@@ -21,6 +21,7 @@ let allDataById = new Map();
 let filteredData = [];
 let currentView = null;
 let selectedAnimalId = null;
+let activeDetailTab = 'general';
 let editReturnView = 'listView';
 let bulkMilkDate = null;
 let milkChartRange = 7;
@@ -828,11 +829,29 @@ function renderTable() {
     observeLazyCardImages(container);
 }
 
-window.openAnimalDetail = function (id) {
+window.openAnimalDetail = function (id, tab = null) {
     const numericId = Number(id);
     if (!Number.isFinite(numericId)) return;
+    const isDifferentAnimal = Number(selectedAnimalId) !== numericId;
+    if (tab) {
+        activeDetailTab = tab;
+    } else if (isDifferentAnimal) {
+        activeDetailTab = 'general';
+    }
     selectedAnimalId = numericId;
     switchView('detailView', true, numericId);
+};
+
+window.switchDetailTab = function (tabKey) {
+    activeDetailTab = tabKey;
+    document.querySelectorAll('#animalDetailContainer .detail-tab-btn').forEach(btn => {
+        const isActive = btn.dataset.tab === tabKey;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    document.querySelectorAll('#animalDetailContainer .detail-tab-panel').forEach(panel => {
+        panel.classList.toggle('active', panel.dataset.tabPanel === tabKey);
+    });
 };
 
 function renderAnimalDetail(id) {
@@ -1377,9 +1396,35 @@ function renderAnimalDetail(id) {
         </div>
     `;
 
+    const milkRecordsCount = isFemale ? getMilkRecords(animal).length : 0;
+    const tabs = [
+        { key: 'general', label: '📋 Genel', count: 0 },
+        ...(isFemale ? [
+            { key: 'milk', label: '🥛 Süt', count: milkRecordsCount },
+            { key: 'reproduction', label: '🤰 Üreme', count: 0 }
+        ] : []),
+        { key: 'health', label: '💉 Sağlık', count: healthRecords.length },
+        { key: 'weightNotes', label: '⚖️ Ağırlık & Not', count: weightRecords.length }
+    ];
+
+    if (!tabs.some(t => t.key === activeDetailTab)) {
+        activeDetailTab = 'general';
+    }
+
+    const tabsBarHtml = `
+        <div class="detail-tabs-bar" role="tablist">
+            ${tabs.map(t => `
+                <button type="button" class="detail-tab-btn ${activeDetailTab === t.key ? 'active' : ''}" data-tab="${t.key}" role="tab" aria-selected="${activeDetailTab === t.key ? 'true' : 'false'}" onclick="switchDetailTab('${t.key}')">
+                    <span>${t.label}</span>
+                    ${t.count > 0 ? `<span class="detail-tab-count">${t.count}</span>` : ''}
+                </button>
+            `).join('')}
+        </div>
+    `;
+
     container.innerHTML = `
-        <div class="card">
-            <div class="detail-header">
+        <div class="card detail-summary-card">
+            <div class="detail-header" style="margin-bottom: 0.75rem; padding-bottom: 0.75rem;">
                 <div>
                     <h2>Küpe: ${escapeHtml(animal.kupeNo)}</h2>
                     ${animal.hayvanLakabi ? `<p class="detail-subtitle">Lakap: ${escapeHtml(animal.hayvanLakabi)}</p>` : ''}
@@ -1391,50 +1436,7 @@ function renderAnimalDetail(id) {
                 </div>
             </div>
 
-            ${animalTags.length > 0 ? `<div class="card-tags-row" style="margin-bottom: 1rem;">${animalTags.map(tag => `<span class="animal-tag-chip">#${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
-
-            <div class="detail-info-grid">
-                <div class="detail-info-item">
-                    <span class="detail-info-label">Cinsiyet</span>
-                    <span class="detail-info-value">${escapeHtml(animal.cinsiyet || '-')}</span>
-                </div>
-                <div class="detail-info-item">
-                    <span class="detail-info-label">Irk</span>
-                    <span class="detail-info-value">${escapeHtml(animal.hayvanCinsi || '-')}</span>
-                </div>
-                <div class="detail-info-item">
-                    <span class="detail-info-label">Doğum Tarihi</span>
-                    <span class="detail-info-value">${formatDateTR(animal.dogumTarihi)}</span>
-                </div>
-                <div class="detail-info-item">
-                    <span class="detail-info-label">Yaş</span>
-                    <span class="detail-info-value">${calculateAgeInfo(animal.dogumTarihi)?.label || '-'}</span>
-                </div>
-                <div class="detail-info-item">
-                    <span class="detail-info-label">Koğuştuğu Tarih</span>
-                    <span class="detail-info-value">${formatDateTR(animal.kogustuguTarih)}</span>
-                </div>
-                <div class="detail-info-item">
-                    <span class="detail-info-label">Anne Küpe No</span>
-                    <span class="detail-info-value">${escapeHtml(animal.anneKupeNo || '-')}</span>
-                </div>
-                <div class="detail-info-item">
-                    <span class="detail-info-label">Annesinin Cinsi</span>
-                    <span class="detail-info-value">${escapeHtml(animal.anneCinsi || '-')}</span>
-                </div>
-                ${exitInfoItems}
-            </div>
-
-            <div class="detail-images">
-                <div class="detail-img-box">
-                    <p>Hayvan Resmi</p>
-                    ${hayvanResmiHtml}
-                </div>
-                <div class="detail-img-box">
-                    <p>Anne Resmi</p>
-                    ${anneResmiHtml}
-                </div>
-            </div>
+            ${animalTags.length > 0 ? `<div class="card-tags-row" style="margin-bottom: 0.85rem;">${animalTags.map(tag => `<span class="animal-tag-chip">#${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
 
             <div class="detail-actions">
                 <button class="btn-info" onclick="startEdit(${animal.id})">✏️ Düzenle</button>
@@ -1442,12 +1444,74 @@ function renderAnimalDetail(id) {
                 <button class="btn-danger" onclick="deleteData(${animal.id})">Kalıcı Sil</button>
             </div>
         </div>
-        ${notesSectionHtml}
-        ${weightSectionHtml}
-        ${reproductionSectionHtml}
-        ${healthSectionHtml}
-        ${pedigreeSectionHtml}
-        ${milkSectionHtml}
+
+        ${tabsBarHtml}
+
+        <div class="detail-tab-panel ${activeDetailTab === 'general' ? 'active' : ''}" data-tab-panel="general">
+            <div class="card">
+                <div class="detail-info-grid">
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Cinsiyet</span>
+                        <span class="detail-info-value">${escapeHtml(animal.cinsiyet || '-')}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Irk</span>
+                        <span class="detail-info-value">${escapeHtml(animal.hayvanCinsi || '-')}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Doğum Tarihi</span>
+                        <span class="detail-info-value">${formatDateTR(animal.dogumTarihi)}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Yaş</span>
+                        <span class="detail-info-value">${calculateAgeInfo(animal.dogumTarihi)?.label || '-'}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Koğuştuğu Tarih</span>
+                        <span class="detail-info-value">${formatDateTR(animal.kogustuguTarih)}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Anne Küpe No</span>
+                        <span class="detail-info-value">${escapeHtml(animal.anneKupeNo || '-')}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Annesinin Cinsi</span>
+                        <span class="detail-info-value">${escapeHtml(animal.anneCinsi || '-')}</span>
+                    </div>
+                    ${exitInfoItems}
+                </div>
+
+                <div class="detail-images" style="margin-bottom: 0;">
+                    <div class="detail-img-box">
+                        <p>Hayvan Resmi</p>
+                        ${hayvanResmiHtml}
+                    </div>
+                    <div class="detail-img-box">
+                        <p>Anne Resmi</p>
+                        ${anneResmiHtml}
+                    </div>
+                </div>
+            </div>
+            ${pedigreeSectionHtml}
+        </div>
+
+        ${isFemale ? `
+            <div class="detail-tab-panel ${activeDetailTab === 'milk' ? 'active' : ''}" data-tab-panel="milk">
+                ${milkSectionHtml}
+            </div>
+            <div class="detail-tab-panel ${activeDetailTab === 'reproduction' ? 'active' : ''}" data-tab-panel="reproduction">
+                ${reproductionSectionHtml}
+            </div>
+        ` : ''}
+
+        <div class="detail-tab-panel ${activeDetailTab === 'health' ? 'active' : ''}" data-tab-panel="health">
+            ${healthSectionHtml}
+        </div>
+
+        <div class="detail-tab-panel ${activeDetailTab === 'weightNotes' ? 'active' : ''}" data-tab-panel="weightNotes">
+            ${weightSectionHtml}
+            ${notesSectionHtml}
+        </div>
     `;
 }
 
@@ -1629,7 +1693,7 @@ function renderHomeHealthAlerts() {
                     const isOverdue = daysUntil < 0;
                     const pillClass = isOverdue ? 'repro-pill-urgent' : (daysUntil <= 7 ? 'repro-pill-dryoff' : 'repro-pill-normal');
                     return `
-                        <div class="health-alert-item ${isOverdue ? 'overdue' : ''}" onclick="openAnimalDetail(${animal.id})">
+                        <div class="health-alert-item ${isOverdue ? 'overdue' : ''}" onclick="openAnimalDetail(${animal.id}, 'health')">
                             <div>
                                 <div class="repro-alert-name">Küpe: ${escapeHtml(animal.kupeNo)}${animal.hayvanLakabi ? ` (${escapeHtml(animal.hayvanLakabi)})` : ''} — ${escapeHtml(record.title)}</div>
                                 <div class="repro-alert-date">Planlanan Tarih: ${formatDateTR(record.nextDate)}</div>
@@ -1806,7 +1870,7 @@ function renderHomeReproductionAlerts() {
                     ${upcomingBirths.map(({ animal, info }) => {
                         const pillClass = info.daysUntilCalving <= 7 ? 'repro-pill-urgent' : 'repro-pill-soon';
                         return `
-                            <div class="repro-alert-item" onclick="openAnimalDetail(${animal.id})">
+                            <div class="repro-alert-item" onclick="openAnimalDetail(${animal.id}, 'reproduction')">
                                 <div>
                                     <div class="repro-alert-name">Küpe: ${escapeHtml(animal.kupeNo)}${animal.hayvanLakabi ? ` (${escapeHtml(animal.hayvanLakabi)})` : ''}</div>
                                     <div class="repro-alert-date">Tahmini Doğum: ${formatDateTR(info.estimatedCalvingDate)}</div>
@@ -1833,7 +1897,7 @@ function renderHomeReproductionAlerts() {
                             ? 'Kuruya çekilmeli'
                             : `${info.daysUntilDryOff} gün kaldı`;
                         return `
-                            <div class="repro-alert-item dryoff-item" onclick="openAnimalDetail(${animal.id})">
+                            <div class="repro-alert-item dryoff-item" onclick="openAnimalDetail(${animal.id}, 'reproduction')">
                                 <div>
                                     <div class="repro-alert-name">Küpe: ${escapeHtml(animal.kupeNo)}${animal.hayvanLakabi ? ` (${escapeHtml(animal.hayvanLakabi)})` : ''}</div>
                                     <div class="repro-alert-date">Kuruya Çekme: ${formatDateTR(info.dryOffDate)} · Doğum: ${formatDateTR(info.estimatedCalvingDate)}</div>
@@ -2313,7 +2377,7 @@ function renderMilkAnalyticsSection() {
         : `<div class="top-cows-list">${topCows.map((item, idx) => {
             const rankClass = idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''));
             return `
-                <div class="top-cow-item" onclick="openAnimalDetail(${item.animal.id})">
+                <div class="top-cow-item" onclick="openAnimalDetail(${item.animal.id}, 'milk')">
                     <div class="top-cow-left">
                         <span class="top-cow-rank ${rankClass}">${idx + 1}</span>
                         <div>
@@ -2399,7 +2463,7 @@ function renderMilkView() {
         return `
             <div class="bulk-milk-row" data-search="${escapeHtml(searchKey)}">
                 <div class="bulk-milk-row-header">
-                    <span class="bulk-cow-link" onclick="openAnimalDetail(${animal.id})">
+                    <span class="bulk-cow-link" onclick="openAnimalDetail(${animal.id}, 'milk')">
                         Küpe: ${escapeHtml(animal.kupeNo)}
                         ${animal.hayvanLakabi ? `<span class="bulk-cow-nick">(${escapeHtml(animal.hayvanLakabi)})</span>` : ''}
                     </span>
