@@ -2711,3 +2711,409 @@ input.input-error {
     font-size: 0.76rem;
     border-radius: 6px;
 }
+
+/* --- KARANLIK MOD (GECE / AHIR MODU) --- */
+.theme-toggle-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+}
+
+.theme-toggle-btn {
+    margin: 0;
+    padding: 0.42rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    background: white;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.theme-toggle-btn:hover {
+    background: #f1f5f9;
+}
+
+body.dark-mode {
+    background: #0f172a;
+    color: #e2e8f0;
+    color-scheme: dark;
+}
+
+body.dark-mode .theme-toggle-btn {
+    background: #1e293b;
+    color: #fde68a;
+    border-color: #334155;
+}
+
+body.dark-mode .theme-toggle-btn:hover {
+    background: #273449;
+}
+
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode .login-card h2,
+body.dark-mode .dash-card h3,
+body.dark-mode .milk-history-title,
+body.dark-mode .pedigree-block-header h4,
+body.dark-mode .finance-breakdown-box h4,
+body.dark-mode #homeView h2 {
+    color: #f1f5f9 !important;
+}
+
+body.dark-mode .card-header h3,
+body.dark-mode .detail-header h2,
+body.dark-mode .milk-section-header h3,
+body.dark-mode .chart-header-bar h3,
+body.dark-mode .home-milk-header h3,
+body.dark-mode .bulk-cow-link,
+body.dark-mode .pedigree-item-name,
+body.dark-mode .lactation-title,
+body.dark-mode .milk-stat-value,
+body.dark-mode .install-card h3 {
+    color: #60a5fa !important;
+}
+
+body.dark-mode .home-stats-header h3 {
+    color: #34d399 !important;
+}
+
+body.dark-mode .home-repro-title {
+    color: #f472b6;
+}
+
+body.dark-mode .home-repro-title.dryoff-title {
+    color: #fbbf24;
+}
+
+body.dark-mode .home-health-title {
+    color: #4ade80;
+}
+
+body.dark-mode .card,
+body.dark-mode .login-card,
+body.dark-mode .dash-card,
+body.dark-mode .animal-card,
+body.dark-mode .install-card,
+body.dark-mode .detail-tabs-bar,
+body.dark-mode .home-stats-card,
+body.dark-mode .home-milk-card,
+body.dark-mode .home-repro-card,
+body.dark-mode .home-health-card,
+body.dark-mode .table-responsive {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .card-header,
+body.dark-mode .card-footer,
+body.dark-mode th,
+body.dark-mode .detail-info-item,
+body.dark-mode .home-stat-box,
+body.dark-mode .home-milk-metric,
+body.dark-mode .milk-stat-card,
+body.dark-mode .milk-history-item,
+body.dark-mode .milk-empty-state,
+body.dark-mode .bulk-summary-box,
+body.dark-mode .bulk-milk-row,
+body.dark-mode .bulk-animal-check-item,
+body.dark-mode .top-cow-item,
+body.dark-mode .pedigree-item,
+body.dark-mode .health-history-item,
+body.dark-mode .finance-kpi-card,
+body.dark-mode .finance-breakdown-box,
+body.dark-mode .finance-tx-item,
+body.dark-mode .repro-banner-info,
+body.dark-mode #syncCard .grid > div {
+    background: #162032 !important;
+    border-color: #334155 !important;
+    color: #e2e8f0;
+}
+
+body.dark-mode .card-header-clickable:hover,
+body.dark-mode .top-cow-item:hover,
+body.dark-mode .pedigree-item.clickable:hover,
+body.dark-mode .detail-tab-btn:hover {
+    background: #273449 !important;
+}
+
+body.dark-mode .card-no-img,
+body.dark-mode .card-img-slot {
+    background: #0f172a;
+    border-color: #334155;
+    color: #94a3b8;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
+body.dark-mode .filters-wrapper select,
+body.dark-mode .date-input-group input[type="date"],
+body.dark-mode .sort-select,
+body.dark-mode .notes-textarea {
+    background: #0f172a;
+    color: #f1f5f9;
+    border-color: #475569;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+    color: #64748b;
+}
+
+body.dark-mode input.input-error {
+    background-color: #2b1519;
+    border-color: #f87171;
+}
+
+body.dark-mode label,
+body.dark-mode .card-info-row strong,
+body.dark-mode .detail-info-value,
+body.dark-mode .home-stat-box-value,
+body.dark-mode .home-milk-metric-value,
+body.dark-mode .bulk-summary-val,
+body.dark-mode .milk-history-date,
+body.dark-mode .top-cow-name,
+body.dark-mode .repro-alert-name,
+body.dark-mode .health-record-title,
+body.dark-mode .bulk-animal-check-title,
+body.dark-mode .finance-cat-bar-meta,
+body.dark-mode .repro-progress-meta {
+    color: #f1f5f9;
+}
+
+body.dark-mode p,
+body.dark-mode .dash-card p,
+body.dark-mode .detail-subtitle,
+body.dark-mode .detail-info-label,
+body.dark-mode .home-stat-box-label,
+body.dark-mode .home-stat-box-sub,
+body.dark-mode .home-milk-metric-label,
+body.dark-mode .home-milk-metric-sub,
+body.dark-mode .home-milk-date,
+body.dark-mode .milk-stat-label,
+body.dark-mode .milk-history-values,
+body.dark-mode .milk-chart-legend,
+body.dark-mode .bulk-summary-label,
+body.dark-mode .bulk-cow-nick,
+body.dark-mode .bulk-milk-inputs label,
+body.dark-mode .bulk-animal-check-meta,
+body.dark-mode .top-cow-sub,
+body.dark-mode .top-cow-total,
+body.dark-mode .repro-alert-date,
+body.dark-mode .pedigree-item-sub,
+body.dark-mode .health-record-meta,
+body.dark-mode .date-input-group label,
+body.dark-mode .card-img-box p,
+body.dark-mode .detail-img-box p,
+body.dark-mode .lactation-sub,
+body.dark-mode .finance-kpi-label {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode .card-info-row,
+body.dark-mode .detail-header,
+body.dark-mode .milk-section-header,
+body.dark-mode .pedigree-block + .pedigree-block,
+body.dark-mode .export-milk-row,
+body.dark-mode .finance-breakdown-row,
+body.dark-mode .home-repro-section + .home-repro-section {
+    border-color: #334155;
+}
+
+body.dark-mode .bottom-nav {
+    background: #1e293b;
+    border-top: 1px solid #334155;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.45);
+}
+
+body.dark-mode .bottom-nav button {
+    color: #94a3b8;
+}
+
+body.dark-mode .bottom-nav button.active {
+    color: #60a5fa;
+    background: #172554;
+}
+
+body.dark-mode .detail-tab-btn {
+    color: #cbd5e1;
+}
+
+body.dark-mode .detail-tab-btn.active {
+    background: #2563eb;
+    color: white;
+}
+
+body.dark-mode .checkbox-label,
+body.dark-mode .milking-toggle-label,
+body.dark-mode .milk-chart-tooltip,
+body.dark-mode .milk-price-row,
+body.dark-mode .lactation-bar {
+    background: #172554;
+    border-color: #1e40af;
+    color: #bfdbfe;
+}
+
+body.dark-mode .milk-total-preview,
+body.dark-mode .bulk-summary-box.total-highlight {
+    background: #122b20;
+    border-color: #166534;
+    color: #86efac;
+}
+
+body.dark-mode .bulk-summary-box.total-highlight .bulk-summary-val {
+    color: #4ade80;
+}
+
+body.dark-mode .bulk-row-total {
+    background: #172554;
+    color: #93c5fd;
+}
+
+body.dark-mode .bulk-date-bar button,
+body.dark-mode .chart-range-btn,
+body.dark-mode .finance-period-bar button,
+body.dark-mode .finance-flow-btn,
+body.dark-mode .bulk-select-chip,
+body.dark-mode .tag-preset-btn,
+body.dark-mode .lactation-stepper button {
+    background: #273449;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+body.dark-mode .bulk-date-bar button.btn-today,
+body.dark-mode .chart-range-btn.active,
+body.dark-mode .finance-period-bar button.active {
+    background: #2563eb;
+    color: white;
+    border-color: #2563eb;
+}
+
+body.dark-mode .finance-flow-btn.active-expense {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+body.dark-mode .finance-flow-btn.active-income {
+    background: #198754;
+    color: white;
+    border-color: #198754;
+}
+
+body.dark-mode .tag-preset-btn.selected {
+    background: #4f46e5;
+    color: white;
+    border-color: #4f46e5;
+}
+
+body.dark-mode .health-preset-chip,
+body.dark-mode .animal-tag-chip {
+    background: #1e1b4b;
+    color: #c7d2fe;
+    border-color: #3730a3;
+}
+
+body.dark-mode .animal-tag-remove {
+    color: #a5b4fc;
+}
+
+body.dark-mode .herd-age-pill {
+    background: #273449;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+body.dark-mode .repro-alert-item {
+    background: #2c1622;
+    border-color: #6b2147;
+}
+
+body.dark-mode .repro-alert-item.dryoff-item,
+body.dark-mode .repro-banner-dryoff {
+    background: #2b2110;
+    border-color: #78350f;
+    color: #fde68a;
+}
+
+body.dark-mode .health-alert-item {
+    background: #122b20;
+    border-color: #166534;
+}
+
+body.dark-mode .health-alert-item.overdue {
+    background: #2b1519;
+    border-color: #7f1d1d;
+}
+
+body.dark-mode .health-record-notes {
+    background: #0f172a;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+body.dark-mode .repro-progress-track,
+body.dark-mode .finance-cat-bar-track {
+    background: #334155;
+}
+
+body.dark-mode .finance-kpi-card.kpi-income,
+body.dark-mode .finance-kpi-card.kpi-net-positive {
+    background: #122b20 !important;
+    border-color: #166534 !important;
+}
+
+body.dark-mode .finance-kpi-card.kpi-income .finance-kpi-value,
+body.dark-mode .finance-kpi-card.kpi-net-positive .finance-kpi-value,
+body.dark-mode .finance-tx-item.is-income .finance-tx-amount,
+body.dark-mode .top-cow-avg,
+body.dark-mode .milk-history-total {
+    color: #4ade80 !important;
+}
+
+body.dark-mode .finance-kpi-card.kpi-expense,
+body.dark-mode .finance-kpi-card.kpi-net-negative {
+    background: #2b1519 !important;
+    border-color: #7f1d1d !important;
+}
+
+body.dark-mode .finance-kpi-card.kpi-expense .finance-kpi-value,
+body.dark-mode .finance-kpi-card.kpi-net-negative .finance-kpi-value,
+body.dark-mode .finance-tx-amount {
+    color: #f87171 !important;
+}
+
+body.dark-mode .milk-chart-svg text {
+    fill: #cbd5e1;
+}
+
+body.dark-mode .milk-chart-svg line {
+    stroke: #334155;
+}
+
+body.dark-mode .swal2-popup {
+    background: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
+body.dark-mode .swal2-title,
+body.dark-mode .swal2-html-container {
+    color: #f1f5f9 !important;
+}
+
+body.dark-mode .swal2-input,
+body.dark-mode .swal2-select {
+    background: #0f172a !important;
+    color: #f1f5f9 !important;
+    border-color: #475569 !important;
+}

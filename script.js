@@ -15,6 +15,35 @@ const routeViews = Object.fromEntries(
     Object.entries(viewRoutes).map(([viewId, route]) => [route, viewId])
 );
 
+function applyTheme(theme) {
+    const isDark = theme === 'dark';
+    document.body.classList.toggle('dark-mode', isDark);
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+        btn.innerText = isDark ? '☀️ Gündüz Modu' : '🌙 Gece Modu';
+    }
+    const meta = document.getElementById('themeColorMeta');
+    if (meta) {
+        meta.setAttribute('content', isDark ? '#0f172a' : '#f4f4f9');
+    }
+}
+
+window.toggleDarkMode = function () {
+    const nextTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+    try {
+        localStorage.setItem('farmTheme', nextTheme);
+    } catch (_) {}
+    applyTheme(nextTheme);
+};
+
+(function initTheme() {
+    let saved = 'light';
+    try {
+        saved = localStorage.getItem('farmTheme') || 'light';
+    } catch (_) {}
+    applyTheme(saved);
+})();
+
 let db;
 let base64Hayvan = "";
 let base64Anne = "";

@@ -10,6 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Çiftlik Veri">
+    <meta name="theme-color" id="themeColorMeta" content="#f4f4f9">
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./cow.png">
     <link rel="icon" type="image/png" href="./cow.png">
@@ -25,6 +26,10 @@
     <div id="loadingOverlay">
         <div class="spinner"></div>
         <div id="loadingText">Veriler işleniyor, lütfen bekleyiniz...</div>
+    </div>
+
+    <div class="theme-toggle-bar">
+        <button type="button" id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleDarkMode()" aria-label="Tema değiştir">🌙 Gece Modu</button>
     </div>
 
     <div id="loginScreen">
