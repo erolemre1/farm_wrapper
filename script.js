@@ -129,6 +129,7 @@ function switchView(viewId, updateHistory = true, animalId = null) {
         if (isDataLoaded) {
             renderHomeMilkSummary();
             renderHomeReproductionAlerts();
+            renderHomeHealthAlerts();
         }
     } else if (viewId === 'listView') {
         if (!isDataLoaded) {
@@ -293,7 +294,8 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         hayvanResmi: base64Hayvan,
         anneResmi: base64Anne,
         isMilking: isMilkingVal,
-        milkRecords: []
+        milkRecords: [],
+        healthRecords: []
     };
 
     const editId = document.getElementById('editId').value;
@@ -308,6 +310,7 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             data.exitDate = existingRecord.exitDate || '';
             data.salePrice = existingRecord.salePrice ?? null;
             data.milkRecords = Array.isArray(existingRecord.milkRecords) ? existingRecord.milkRecords : [];
+            data.healthRecords = Array.isArray(existingRecord.healthRecords) ? existingRecord.healthRecords : [];
         }
     }
 
@@ -472,6 +475,56 @@ function findOffspringAnimals(animal) {
         .sort((a, b) => String(b.dogumTarihi || '').localeCompare(String(a.dogumTarihi || '')));
 }
 
+const HEALTH_TYPE_META = {
+    vaccine: { label: '💉 Aşı', badgeClass: 'health-type-vaccine' },
+    parasite: { label: '🐛 Parazit İlacı', badgeClass: 'health-type-parasite' },
+    treatment: { label: '💊 Tedavi / İlaç', badgeClass: 'health-type-treatment' },
+    vet: { label: '🩺 Veteriner', badgeClass: 'health-type-vet' },
+    other: { label: '📝 Diğer', badgeClass: 'health-type-other' }
+};
+
+function getHealthRecords(row) {
+    if (!row || !Array.isArray(row.healthRecords)) return [];
+    return [...row.healthRecords].sort((a, b) => {
+        const cmp = String(b.date || '').localeCompare(String(a.date || ''));
+        if (cmp !== 0) return cmp;
+        return String(b.id || '').localeCompare(String(a.id || ''));
+    });
+}
+
+function getPendingHealthRemindersForAnimal(animal, maxDaysAhead = 30) {
+    const records = getHealthRecords(animal);
+    if (!records.length) return [];
+    const today = getTodayDateString();
+    const reminders = [];
+
+    records.forEach(rec => {
+        if (!rec.nextDate) return;
+        const daysUntil = diffDaysBetweenDateStr(today, rec.nextDate);
+        if (daysUntil === null || daysUntil > maxDaysAhead || daysUntil < -60) return;
+
+        // Aynı başlıkla sonraki tarihte veya sonrasında yeni kayıt girildiyse hatırlatma tamamlanmıştır
+        const normTitle = String(rec.title || '').trim().toLowerCase();
+        const fulfilled = normTitle && records.some(other =>
+            other.id !== rec.id &&
+            String(other.title || '').trim().toLowerCase() === normTitle &&
+            other.date &&
+            other.date >= rec.nextDate
+        );
+        if (fulfilled) return;
+
+        reminders.push({ record: rec, daysUntil });
+    });
+
+    return reminders.sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
+function formatHealthCountdown(daysUntil) {
+    if (daysUntil > 0) return `${daysUntil} gün kaldı`;
+    if (daysUntil === 0) return 'Bugün!';
+    return `${Math.abs(daysUntil)} gün gecikti`;
+}
+
 function getMilkRecords(row) {
     if (!row || !Array.isArray(row.milkRecords)) return [];
     return [...row.milkRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -493,6 +546,7 @@ function loadData() {
         document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
         renderHomeMilkSummary();
         renderHomeReproductionAlerts();
+        renderHomeHealthAlerts();
         if (currentView === 'listView') {
             applyFilter();
         } else if (currentView === 'detailView') {
@@ -586,6 +640,10 @@ function renderTable() {
         const calvingBadgeHtml = pregnancyInfo && pregnancyInfo.isDueSoon
             ? `<span class="card-badge-calving">🤰 ${pregnancyInfo.countdownText}</span>`
             : '';
+        const urgentHealth = isActive ? getPendingHealthRemindersForAnimal(row, 14)[0] : null;
+        const healthBadgeHtml = urgentHealth
+            ? `<span class="card-badge-health">💉 ${formatHealthCountdown(urgentHealth.daysUntil)}</span>`
+            : '';
         const calvingRowHtml = pregnancyInfo && !pregnancyInfo.isStale
             ? `<div class="card-info-row"><strong>Tahmini Doğum:</strong> <span>${formatDateTR(pregnancyInfo.estimatedCalvingDate)} (${pregnancyInfo.countdownText})</span></div>`
             : '';
@@ -610,6 +668,7 @@ function renderTable() {
                     <h3>Küpe: ${escapeHtml(row.kupeNo)}</h3>
                     <div class="card-badges">
                         ${calvingBadgeHtml}
+                        ${healthBadgeHtml}
                         ${milking ? '<span class="card-badge-milking">🥛 Sağılır</span>' : ''}
                         <span class="card-badge">#${index + 1}</span>
                     </div>
@@ -948,6 +1007,130 @@ function renderAnimalDetail(id) {
         </div>
     `;
 
+    const healthRecords = getHealthRecords(animal);
+    const pendingHealthReminders = getPendingHealthRemindersForAnimal(animal, 365);
+    const nextHealthReminder = pendingHealthReminders[0] || null;
+    const totalHealthCost = healthRecords.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+    const todayForHealth = getTodayDateString();
+
+    const healthHistoryHtml = healthRecords.length === 0
+        ? '<div class="milk-empty-state">Henüz aşı, tedavi veya veteriner kaydı eklenmedi.</div>'
+        : `<div class="health-history-list">${healthRecords.map(rec => {
+            const meta = HEALTH_TYPE_META[rec.type] || HEALTH_TYPE_META.other;
+            const costNum = Number(rec.cost) || 0;
+            let nextBadgeHtml = '';
+            if (rec.nextDate) {
+                const daysUntil = diffDaysBetweenDateStr(todayForHealth, rec.nextDate);
+                const stateCls = daysUntil !== null && daysUntil < 0 ? 'overdue' : (daysUntil !== null && daysUntil <= 14 ? 'soon' : '');
+                const countdownPart = daysUntil !== null ? ` (${formatHealthCountdown(daysUntil)})` : '';
+                nextBadgeHtml = `<span class="health-next-badge ${stateCls}">🔔 Sonraki: ${formatDateTR(rec.nextDate)}${countdownPart}</span>`;
+            }
+            const safeRecId = escapeHtml(rec.id);
+            return `
+                <div class="health-history-item">
+                    <div class="health-history-top">
+                        <div class="health-history-title-wrap">
+                            <span class="health-type-badge ${meta.badgeClass}">${meta.label}</span>
+                            <span class="health-record-title">${escapeHtml(rec.title)}</span>
+                        </div>
+                        <div class="milk-history-actions">
+                            <button type="button" class="btn-info" onclick="editHealthRecord(${animal.id}, '${safeRecId}')" title="Düzenle">✏️</button>
+                            <button type="button" class="btn-danger" onclick="deleteHealthRecord(${animal.id}, '${safeRecId}')" title="Sil">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="health-record-meta">
+                        <span>📅 ${formatDateTR(rec.date)}</span>
+                        ${rec.medicine ? `<span>💊 İlaç: <strong>${escapeHtml(rec.medicine)}</strong></span>` : ''}
+                        ${costNum > 0 ? `<span>💰 Maliyet: <strong>${costNum.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</strong></span>` : ''}
+                    </div>
+                    ${nextBadgeHtml}
+                    ${rec.notes ? `<div class="health-record-notes">${escapeHtml(rec.notes)}</div>` : ''}
+                </div>
+            `;
+        }).join('')}</div>`;
+
+    const healthSectionHtml = `
+        <div class="card">
+            <div class="milk-section-header">
+                <h3>💉 Sağlık, Aşı & Veteriner Kayıtları</h3>
+            </div>
+
+            <div class="health-presets">
+                <button type="button" class="health-preset-chip" onclick="applyHealthPreset('vaccine', 'Şap Aşısı')">💉 Şap Aşısı</button>
+                <button type="button" class="health-preset-chip" onclick="applyHealthPreset('vaccine', 'Brucella Aşısı')">💉 Brucella</button>
+                <button type="button" class="health-preset-chip" onclick="applyHealthPreset('parasite', 'İç-Dış Parazit İlacı')">🐛 Parazit</button>
+                <button type="button" class="health-preset-chip" onclick="applyHealthPreset('treatment', 'Mastitis Tedavisi')">💊 Mastitis</button>
+                <button type="button" class="health-preset-chip" onclick="applyHealthPreset('treatment', 'Ayak / Tırnak Bakımı')">🦶 Ayak Bakımı</button>
+                <button type="button" class="health-preset-chip" onclick="applyHealthPreset('vet', 'Veteriner Muayenesi')">🩺 Muayene</button>
+            </div>
+
+            <form id="healthEntryForm" onsubmit="saveHealthRecord(event, ${animal.id})">
+                <input type="hidden" id="healthRecordEditId" value="">
+                <div class="health-form-grid">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="healthType">İşlem Türü</label>
+                        <select id="healthType" required>
+                            <option value="vaccine">💉 Aşı</option>
+                            <option value="parasite">🐛 Parazit İlacı</option>
+                            <option value="treatment">💊 Tedavi / İlaç</option>
+                            <option value="vet">🩺 Veteriner Muayenesi</option>
+                            <option value="other">📝 Diğer</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="healthDate">İşlem Tarihi</label>
+                        <input type="date" id="healthDate" value="${todayForHealth}" required>
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="healthTitle">İşlem / Aşı Adı</label>
+                        <input type="text" id="healthTitle" placeholder="Örn. Şap Aşısı, Mastitis Tedavisi" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="healthMedicine">İlaç / Aşı Markası (İsteğe Bağlı)</label>
+                        <input type="text" id="healthMedicine" placeholder="Örn. İvermektin, Antibiyotik">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="healthCost">Maliyet (TL - İsteğe Bağlı)</label>
+                        <input type="number" id="healthCost" min="0" step="0.01" inputmode="decimal" placeholder="Örn. 750">
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="healthNextDate">Sıradaki Aşı / Kontrol Tarihi (Hatırlatma İçin)</label>
+                        <input type="date" id="healthNextDate">
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="healthNotes">Veteriner Notu / Açıklama</label>
+                        <input type="text" id="healthNotes" placeholder="Kısa not veya doz bilgisi...">
+                    </div>
+                </div>
+                <div class="health-form-actions">
+                    <button type="submit" id="healthSubmitBtn" class="btn-primary" style="flex: 1;">💾 Sağlık Kaydını Kaydet</button>
+                    <button type="button" id="healthCancelEditBtn" class="btn-secondary" style="display: none;" onclick="resetHealthForm()">İptal</button>
+                </div>
+            </form>
+
+            ${healthRecords.length > 0 ? `
+                <div class="milk-stats-grid">
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Toplam İşlem</span>
+                        <span class="milk-stat-value">${healthRecords.length}</span>
+                    </div>
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Toplam Maliyet</span>
+                        <span class="milk-stat-value">${totalHealthCost.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL</span>
+                    </div>
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Sıradaki Hatırlatma</span>
+                        <span class="milk-stat-value" style="font-size: 0.95rem;">${nextHealthReminder ? formatDateTR(nextHealthReminder.record.nextDate) : '-'}</span>
+                        ${nextHealthReminder ? `<span class="home-milk-metric-sub">${escapeHtml(nextHealthReminder.record.title)} (${formatHealthCountdown(nextHealthReminder.daysUntil)})</span>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
+            <h4 class="milk-history-title">Sağlık & Aşı Geçmişi</h4>
+            ${healthHistoryHtml}
+        </div>
+    `;
+
     container.innerHTML = `
         <div class="card">
             <div class="detail-header">
@@ -1008,10 +1191,179 @@ function renderAnimalDetail(id) {
             </div>
         </div>
         ${reproductionSectionHtml}
+        ${healthSectionHtml}
         ${pedigreeSectionHtml}
         ${milkSectionHtml}
     `;
 }
+
+function renderHomeHealthAlerts() {
+    const container = document.getElementById('homeHealthAlerts');
+    if (!container) return;
+
+    const reminders = [];
+    allData.forEach(animal => {
+        const isActive = !animal.herdStatus || animal.herdStatus === 'active';
+        if (!isActive) return;
+
+        getPendingHealthRemindersForAnimal(animal, 30).forEach(item => {
+            reminders.push({ animal, record: item.record, daysUntil: item.daysUntil });
+        });
+    });
+
+    if (reminders.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    reminders.sort((a, b) => a.daysUntil - b.daysUntil);
+
+    container.innerHTML = `
+        <div class="home-health-card">
+            <h3 class="home-health-title">
+                <span>💉 Yaklaşan Aşı & Sağlık Hatırlatmaları</span>
+                <span class="repro-pill repro-pill-normal">${reminders.length} kayıt</span>
+            </h3>
+            <div class="repro-alert-list">
+                ${reminders.map(({ animal, record, daysUntil }) => {
+                    const isOverdue = daysUntil < 0;
+                    const pillClass = isOverdue ? 'repro-pill-urgent' : (daysUntil <= 7 ? 'repro-pill-dryoff' : 'repro-pill-normal');
+                    return `
+                        <div class="health-alert-item ${isOverdue ? 'overdue' : ''}" onclick="openAnimalDetail(${animal.id})">
+                            <div>
+                                <div class="repro-alert-name">Küpe: ${escapeHtml(animal.kupeNo)}${animal.hayvanLakabi ? ` (${escapeHtml(animal.hayvanLakabi)})` : ''} — ${escapeHtml(record.title)}</div>
+                                <div class="repro-alert-date">Planlanan Tarih: ${formatDateTR(record.nextDate)}</div>
+                            </div>
+                            <span class="repro-pill ${pillClass}">${formatHealthCountdown(daysUntil)}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+}
+
+window.applyHealthPreset = function (type, title) {
+    const typeEl = document.getElementById('healthType');
+    const titleEl = document.getElementById('healthTitle');
+    if (typeEl) typeEl.value = type;
+    if (titleEl) {
+        titleEl.value = title;
+        titleEl.focus();
+    }
+};
+
+window.resetHealthForm = function () {
+    const form = document.getElementById('healthEntryForm');
+    if (form) form.reset();
+    const editIdEl = document.getElementById('healthRecordEditId');
+    const dateEl = document.getElementById('healthDate');
+    const submitBtn = document.getElementById('healthSubmitBtn');
+    const cancelBtn = document.getElementById('healthCancelEditBtn');
+    if (editIdEl) editIdEl.value = '';
+    if (dateEl) dateEl.value = getTodayDateString();
+    if (submitBtn) submitBtn.innerText = '💾 Sağlık Kaydını Kaydet';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+};
+
+window.saveHealthRecord = function (event, animalId) {
+    event.preventDefault();
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+
+    const editRecId = document.getElementById('healthRecordEditId')?.value || '';
+    const type = document.getElementById('healthType')?.value || 'other';
+    const date = document.getElementById('healthDate')?.value || '';
+    const title = document.getElementById('healthTitle')?.value.trim() || '';
+    const medicine = document.getElementById('healthMedicine')?.value.trim() || '';
+    const rawCost = document.getElementById('healthCost')?.value.trim() || '';
+    const nextDate = document.getElementById('healthNextDate')?.value || '';
+    const notes = document.getElementById('healthNotes')?.value.trim() || '';
+
+    if (!date || !title) {
+        Swal.fire({ title: 'Uyarı', text: 'Lütfen tarih ve işlem/aşı adını girin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const cost = rawCost === '' ? 0 : Number(rawCost);
+    if (!Number.isFinite(cost) || cost < 0) {
+        Swal.fire({ title: 'Hata', text: 'Geçerli bir maliyet tutarı girin.', icon: 'error', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const recordObj = {
+        id: editRecId || `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date,
+        type,
+        title,
+        medicine,
+        cost,
+        nextDate,
+        notes
+    };
+
+    const existing = getHealthRecords(animal).filter(r => r.id !== recordObj.id);
+    existing.push(recordObj);
+    existing.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+    const updatedAnimal = { ...animal, healthRecords: existing };
+    updateAnimalRecordInDB(updatedAnimal, () => {
+        renderAnimalDetail(updatedAnimal.id);
+        Swal.fire({
+            title: editRecId ? 'Güncellendi!' : 'Kaydedildi!',
+            text: `${title} kaydı başarıyla işlendi.`,
+            icon: 'success',
+            timer: 1400,
+            showConfirmButton: false
+        });
+    });
+};
+
+window.editHealthRecord = function (animalId, recordId) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+    const rec = getHealthRecords(animal).find(r => r.id === recordId);
+    if (!rec) return;
+
+    document.getElementById('healthRecordEditId').value = rec.id;
+    document.getElementById('healthType').value = rec.type || 'other';
+    document.getElementById('healthDate').value = rec.date || getTodayDateString();
+    document.getElementById('healthTitle').value = rec.title || '';
+    document.getElementById('healthMedicine').value = rec.medicine || '';
+    document.getElementById('healthCost').value = rec.cost ? rec.cost : '';
+    document.getElementById('healthNextDate').value = rec.nextDate || '';
+    document.getElementById('healthNotes').value = rec.notes || '';
+    document.getElementById('healthSubmitBtn').innerText = '💾 Kaydı Güncelle';
+    document.getElementById('healthCancelEditBtn').style.display = 'inline-block';
+
+    const formEl = document.getElementById('healthEntryForm');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+window.deleteHealthRecord = function (animalId, recordId) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+    const rec = getHealthRecords(animal).find(r => r.id === recordId);
+    if (!rec) return;
+
+    Swal.fire({
+        title: 'Sağlık kaydını sil?',
+        text: `${formatDateTR(rec.date)} - ${rec.title} kaydı silinecek.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Evet, Sil',
+        cancelButtonText: 'İptal'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const remaining = getHealthRecords(animal).filter(r => r.id !== recordId);
+        const updatedAnimal = { ...animal, healthRecords: remaining };
+        updateAnimalRecordInDB(updatedAnimal, () => {
+            renderAnimalDetail(updatedAnimal.id);
+        });
+    });
+};
 
 function renderHomeReproductionAlerts() {
     const container = document.getElementById('homeReproductionAlerts');
@@ -1159,6 +1511,7 @@ function updateAnimalRecordInDB(updatedAnimal, onSuccess) {
         isListDirty = true;
         renderHomeMilkSummary();
         renderHomeReproductionAlerts();
+        renderHomeHealthAlerts();
         if (onSuccess) onSuccess();
     };
 }

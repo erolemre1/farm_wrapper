@@ -1704,3 +1704,200 @@
     color: #0d6efd;
     white-space: nowrap;
 }
+
+/* --- SAĞLIK, AŞI VE VETERİNER KAYITLARI --- */
+.card-badge-health {
+    background: #198754;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.76rem;
+    font-weight: bold;
+}
+
+.home-health-alerts {
+    margin: 0 0.5rem 1.25rem 0.5rem;
+}
+
+.home-health-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    border-left: 5px solid #198754;
+}
+
+.home-health-title {
+    margin: 0 0 0.65rem 0;
+    font-size: 1rem;
+    color: #146c43;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.health-alert-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 0.65rem 0.85rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.health-alert-item:hover {
+    background: #dcfce7;
+}
+
+.health-alert-item.overdue {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.health-alert-item.overdue:hover {
+    background: #fee2e2;
+}
+
+.health-presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+
+.health-preset-chip {
+    margin: 0;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: #eef5ff;
+    color: #084298;
+    border: 1px solid #cfe2ff;
+    border-radius: 999px;
+}
+
+.health-preset-chip:hover {
+    background: #dcebff;
+}
+
+.health-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 0.85rem;
+}
+
+@media (max-width: 550px) {
+    .health-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.health-form-grid .full-span {
+    grid-column: 1 / -1;
+}
+
+.health-form-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.health-form-actions button {
+    margin: 0;
+}
+
+.health-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.health-history-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 0.8rem 0.9rem;
+}
+
+.health-history-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.health-history-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.health-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+}
+
+.health-type-vaccine { background: #198754; }
+.health-type-parasite { background: #6f42c1; }
+.health-type-treatment { background: #dc3545; }
+.health-type-vet { background: #0d6efd; }
+.health-type-other { background: #6c757d; }
+
+.health-record-title {
+    font-weight: 700;
+    color: #222;
+    font-size: 0.96rem;
+}
+
+.health-record-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.83rem;
+    color: #555;
+    margin-bottom: 4px;
+}
+
+.health-record-notes {
+    font-size: 0.84rem;
+    color: #444;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 0.45rem 0.65rem;
+    margin-top: 6px;
+}
+
+.health-next-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: #e7f5ff;
+    color: #0c5460;
+}
+
+.health-next-badge.overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.health-next-badge.soon {
+    background: #fef3c7;
+    color: #92400e;
+}
