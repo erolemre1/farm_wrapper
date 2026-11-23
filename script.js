@@ -91,8 +91,6 @@ let base64Hayvan = "";
 let base64Anne = "";
 let allData = [];
 let filteredData = [];
-let currentPage = 1;
-const rowsPerPage = 10;
 
 const request = indexedDB.open("CiftlikPro", 1);
 request.onupgradeneeded = (e) => {
@@ -256,9 +254,7 @@ window.applyFilter = function () {
         const lakap = (row.hayvanLakabi || "").toLowerCase();
         return kupe.includes(searchTerm) || cins.includes(searchTerm) || lakap.includes(searchTerm);
     });
-    currentPage = 1;
     renderTable();
-    renderPagination();
 };
 
 function renderTable() {
@@ -271,11 +267,7 @@ function renderTable() {
         return;
     }
 
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    const pageData = filteredData.slice(startIndex, endIndex);
-
-    pageData.forEach((row, index) => {
+    filteredData.forEach((row, index) => {
         // Resim varsa göster, yoksa gri "Fotoğraf Yok" kutusu oluştur
         const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
         const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
@@ -295,7 +287,7 @@ function renderTable() {
             <div class="animal-card">
                 <div class="card-header">
                     <h3>Küpe: ${row.kupeNo}</h3>
-                    <span class="card-badge">#${startIndex + index + 1}</span>
+                    <span class="card-badge">#${index + 1}</span>
                 </div>
                 <div class="card-body">
                     <div class="card-info-row"><strong>Lakap:</strong> <span>${row.hayvanLakabi || '-'}</span></div>
@@ -325,25 +317,6 @@ function renderTable() {
             </div>
         `;
     });
-}
-
-function renderPagination() {
-    const paginationDiv = document.getElementById('pagination');
-    paginationDiv.innerHTML = "";
-    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-    if (totalPages <= 1) return;
-
-    for (let i = 1; i <= totalPages; i++) {
-        const btn = document.createElement('button');
-        btn.innerText = i;
-        btn.className = i === currentPage ? 'page-btn active' : 'page-btn';
-        btn.onclick = () => {
-            currentPage = i;
-            renderTable();
-            renderPagination();
-        };
-        paginationDiv.appendChild(btn);
-    }
 }
 
 window.startEdit = function (row) {
@@ -864,9 +837,7 @@ window.applyFilter = function () {
     const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
     totalCountEl.innerText = `Sürüde: ${activeCount} | Gösterilen: ${filteredData.length}`;
     
-    currentPage = 1;
     renderTable();
-    renderPagination();
 };
 
 window.clearSearch = function () {

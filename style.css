@@ -198,26 +198,6 @@
             background: #f8f9fa;
         }
 
-        .pagination {
-            display: flex;
-            gap: 5px;
-            justify-content: center;
-            margin-top: 15px;
-        }
-
-        .page-btn {
-            padding: 15px 20px;
-            background: #e9ecef;
-            color: black;
-            border-radius: 4px;
-            margin: 0;
-        }
-
-        .page-btn.active {
-            background: #0056b3;
-            color: white;
-        }
-
         .modal {
             display: none;
             position: fixed;
