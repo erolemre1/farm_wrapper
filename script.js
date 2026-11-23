@@ -4,6 +4,7 @@ const viewRoutes = {
     homeView: 'home',
     addView: 'add-animal',
     listView: 'animals',
+    detailView: 'animal-detail',
     syncView: 'sync'
 };
 
@@ -18,10 +19,24 @@ let allData = [];
 let allDataById = new Map();
 let filteredData = [];
 let currentView = null;
+let selectedAnimalId = null;
+let editReturnView = 'listView';
 let isDataLoaded = false;
 let isDataLoading = false;
 let isListDirty = true;
 let imageObserver = null;
+
+function parseRouteFromHash() {
+    const rawHash = window.location.hash.slice(1);
+    if (rawHash.startsWith(`${viewRoutes.detailView}/`)) {
+        const parsedId = Number(rawHash.slice(viewRoutes.detailView.length + 1));
+        if (Number.isFinite(parsedId) && parsedId > 0) {
+            return { viewId: 'detailView', animalId: parsedId };
+        }
+        return { viewId: 'listView', animalId: null };
+    }
+    return { viewId: routeViews[rawHash] || 'homeView', animalId: null };
+}
 
 if (sessionStorage.getItem("loggedIn") === "true") {
     showApp();
@@ -51,10 +66,12 @@ function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('bottomNav').style.display = 'flex'; // Navigasyonu aç
-    const initialView = routeViews[window.location.hash.slice(1)] || 'homeView';
-    const initialRoute = viewRoutes[initialView];
-    history.replaceState({ appView: initialView }, '', `${window.location.pathname}${window.location.search}#${initialRoute}`);
-    switchView(initialView, false);
+    const { viewId: initialView, animalId } = parseRouteFromHash();
+    const initialRoute = initialView === 'detailView' && animalId
+        ? `${viewRoutes.detailView}/${animalId}`
+        : viewRoutes[initialView];
+    history.replaceState({ appView: initialView, animalId }, '', `${window.location.pathname}${window.location.search}#${initialRoute}`);
+    switchView(initialView, false, animalId);
     if (db && !isDataLoaded && !isDataLoading) {
         loadData();
     }
@@ -67,14 +84,21 @@ function handleEnter(e) {
 }
 
 // YENİ: Ekranlar Arası Geçiş Fonksiyonu
-function switchView(viewId, updateHistory = true) {
+function switchView(viewId, updateHistory = true, animalId = null) {
     const route = viewRoutes[viewId];
     if (!route) return;
 
     currentView = viewId;
+    if (viewId === 'detailView' && animalId !== null && animalId !== undefined) {
+        selectedAnimalId = Number(animalId);
+    }
 
-    if (updateHistory && window.location.hash !== `#${route}`) {
-        history.pushState({ appView: viewId }, '', `#${route}`);
+    const targetHash = viewId === 'detailView' && selectedAnimalId
+        ? `#${route}/${selectedAnimalId}`
+        : `#${route}`;
+
+    if (updateHistory && window.location.hash !== targetHash) {
+        history.pushState({ appView: viewId, animalId: viewId === 'detailView' ? selectedAnimalId : null }, '', targetHash);
     }
 
     // 1. Tüm sayfaları gizle
@@ -90,13 +114,14 @@ function switchView(viewId, updateHistory = true) {
 
     // 3. Alt menüdeki (Bottom Nav) butonların renklerini güncelle
     document.querySelectorAll('.bottom-nav button').forEach(btn => btn.classList.remove('active'));
-    const activeBtn = document.querySelector(`.bottom-nav button[onclick="switchView('${viewId}')"]`);
+    const navViewId = viewId === 'detailView' ? 'listView' : viewId;
+    const activeBtn = document.querySelector(`.bottom-nav button[onclick="switchView('${navViewId}')"]`);
     if(activeBtn) activeBtn.classList.add('active');
 
     // 4. Sayfayı en üste kaydır
     window.scrollTo(0, 0);
 
-    // 5. Liste ekranı açıldığında verileri/kartları tembel yükle
+    // 5. Liste veya detay ekranı açıldığında verileri/kartları yükle
     if (viewId === 'listView') {
         if (!isDataLoaded) {
             const container = document.getElementById('cardContainer');
@@ -111,12 +136,26 @@ function switchView(viewId, updateHistory = true) {
         } else {
             observeLazyCardImages(document.getElementById('cardContainer'));
         }
+    } else if (viewId === 'detailView') {
+        if (!isDataLoaded) {
+            const detailContainer = document.getElementById('animalDetailContainer');
+            if (detailContainer) {
+                detailContainer.innerHTML = `<div class="card" style="text-align: center; color: #666; font-style: italic;">Hayvan bilgileri yükleniyor...</div>`;
+            }
+            if (db && !isDataLoading) {
+                loadData();
+            }
+        } else {
+            renderAnimalDetail(selectedAnimalId);
+        }
     }
 }
 
 window.addEventListener('popstate', (event) => {
-    const viewId = routeViews[window.location.hash.slice(1)] || event.state?.appView || 'homeView';
-    switchView(viewId, false);
+    const parsed = parseRouteFromHash();
+    const viewId = parsed.viewId || event.state?.appView || 'homeView';
+    const animalId = parsed.animalId ?? event.state?.animalId ?? null;
+    switchView(viewId, false, animalId);
 });
 
 const request = indexedDB.open("CiftlikPro", 1);
@@ -204,30 +243,51 @@ window.removeImage = function (type) {
     }
 };
 
+window.toggleMilkingFormField = function () {
+    const cinsiyetEl = document.getElementById('cinsiyet');
+    const groupEl = document.getElementById('milkingFormGroup');
+    const checkboxEl = document.getElementById('isMilking');
+    if (!cinsiyetEl || !groupEl || !checkboxEl) return;
+
+    if (cinsiyetEl.value === 'Dişi') {
+        groupEl.style.display = 'block';
+    } else {
+        groupEl.style.display = 'none';
+        checkboxEl.checked = false;
+    }
+};
+
 document.getElementById('animalForm').addEventListener('submit', (e) => {
     e.preventDefault();
+    const cinsiyetVal = document.getElementById('cinsiyet').value;
+    const isMilkingVal = cinsiyetVal === 'Dişi' ? document.getElementById('isMilking').checked : false;
     const data = {
         kupeNo: document.getElementById('kupeNo').value,
         hayvanLakabi: document.getElementById('hayvanLakabi').value,
-        cinsiyet: document.getElementById('cinsiyet').value,
+        cinsiyet: cinsiyetVal,
         hayvanCinsi: document.getElementById('hayvanCinsi').value,
         dogumTarihi: document.getElementById('dogumTarihi').value,
         anneKupeNo: document.getElementById('anneKupeNo').value,
         anneCinsi: document.getElementById('anneCinsi').value,
         kogustuguTarih: document.getElementById('kogustuguTarih').value,
         hayvanResmi: base64Hayvan,
-        anneResmi: base64Anne
+        anneResmi: base64Anne,
+        isMilking: isMilkingVal,
+        milkRecords: []
     };
 
     const editId = document.getElementById('editId').value;
+    const returnTargetView = editId ? editReturnView : 'listView';
+    const editedAnimalId = editId ? Number(editId) : null;
     if (editId) {
-        data.id = Number(editId);
+        data.id = editedAnimalId;
         const existingRecord = allData.find(row => row.id === data.id);
         if (existingRecord) {
             data.herdStatus = existingRecord.herdStatus || 'active';
             data.exitReason = existingRecord.exitReason || '';
             data.exitDate = existingRecord.exitDate || '';
             data.salePrice = existingRecord.salePrice ?? null;
+            data.milkRecords = Array.isArray(existingRecord.milkRecords) ? existingRecord.milkRecords : [];
         }
     }
 
@@ -238,7 +298,7 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
     else store.add(data);
 
     tx.oncomplete = () => {
-        cancelEdit(); // Formu sıfırla
+        resetAnimalForm();
         loadData();
         Swal.fire({
             title: "Başarılı!",
@@ -247,8 +307,11 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             confirmButtonColor: "#28a745",
             confirmButtonText: 'Tamam',
         }).then(() => {
-            // Kayıt bittikten sonra otomatik olarak Sürü Listesine dön
-            switchView('listView');
+            if (returnTargetView === 'detailView' && editedAnimalId) {
+                openAnimalDetail(editedAnimalId);
+            } else {
+                switchView('listView');
+            }
         });
     };
 
@@ -262,6 +325,41 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         alert("Bu cihaz veya tarayıcı titreşim özelliğini desteklemiyor.");
     }
 });
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getTodayDateString() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function formatDateTR(dateStr) {
+    if (!dateStr) return '-';
+    const parts = String(dateStr).split('-');
+    if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    return dateStr;
+}
+
+function formatLiters(value) {
+    const num = Number(value) || 0;
+    return num.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function isAnimalMilking(row) {
+    return Boolean(row && row.cinsiyet === 'Dişi' && row.isMilking);
+}
+
+function getMilkRecords(row) {
+    if (!row || !Array.isArray(row.milkRecords)) return [];
+    return [...row.milkRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+}
 
 function loadData() {
     if (!db) return;
@@ -279,6 +377,8 @@ function loadData() {
         document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
         if (currentView === 'listView') {
             applyFilter();
+        } else if (currentView === 'detailView') {
+            renderAnimalDetail(selectedAnimalId);
         }
     };
     req.onerror = () => {
@@ -361,6 +461,12 @@ function renderTable() {
             : '<div class="card-no-img">Fotoğraf Yok</div>';
         const hasLazyImages = Boolean(row.hayvanResmi || row.anneResmi);
         const isActive = !row.herdStatus || row.herdStatus === 'active';
+        const milking = isAnimalMilking(row);
+        const milkRecords = row.cinsiyet === 'Dişi' ? getMilkRecords(row) : [];
+        const latestMilk = milkRecords[0] || null;
+        const latestMilkHtml = latestMilk
+            ? `<div class="card-info-row"><strong>Son Süt (${formatDateTR(latestMilk.date)}):</strong> <span>${formatLiters((Number(latestMilk.morning) || 0) + (Number(latestMilk.evening) || 0))} L</span></div>`
+            : '';
         const exitDetailsHtml = isActive ? '' : `
             <div class="card-info-row"><strong>Durum:</strong> <span>${exitLabels[row.herdStatus] || 'Sürüden çıktı'}</span></div>
             <div class="card-info-row"><strong>Çıkış Tarihi:</strong> <span>${row.exitDate || '-'}</span></div>
@@ -373,17 +479,21 @@ function renderTable() {
         // Kart şablonu
         return `
             <div class="animal-card"${hasLazyImages ? ' data-has-lazy="1"' : ''}>
-                <div class="card-header">
-                    <h3>Küpe: ${row.kupeNo}</h3>
-                    <span class="card-badge">#${index + 1}</span>
+                <div class="card-header card-header-clickable" onclick="openAnimalDetail(${row.id})" title="Hayvan detayını görüntüle">
+                    <h3>Küpe: ${escapeHtml(row.kupeNo)}</h3>
+                    <div class="card-badges">
+                        ${milking ? '<span class="card-badge-milking">🥛 Sağılır</span>' : ''}
+                        <span class="card-badge">#${index + 1}</span>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div class="card-info-row"><strong>Lakap:</strong> <span>${row.hayvanLakabi || '-'}</span></div>
-                    <div class="card-info-row"><strong>Cinsiyet:</strong> <span>${row.cinsiyet}</span></div>
-                    <div class="card-info-row"><strong>Irk:</strong> <span>${row.hayvanCinsi}</span></div>
+                    <div class="card-info-row"><strong>Lakap:</strong> <span>${escapeHtml(row.hayvanLakabi || '-')}</span></div>
+                    <div class="card-info-row"><strong>Cinsiyet:</strong> <span>${escapeHtml(row.cinsiyet)}</span></div>
+                    <div class="card-info-row"><strong>Irk:</strong> <span>${escapeHtml(row.hayvanCinsi)}</span></div>
                     <div class="card-info-row"><strong>Doğum Tarihi:</strong> <span>${row.dogumTarihi || '-'}</span></div>
                     <div class="card-info-row"><strong>Koğuştuğu Tarih:</strong> <span>${row.kogustuguTarih || '-'}</span></div>
-                    <div class="card-info-row"><strong>Anne Küpe No:</strong> <span>${row.anneKupeNo || '-'}</span></div>
+                    <div class="card-info-row"><strong>Anne Küpe No:</strong> <span>${escapeHtml(row.anneKupeNo || '-')}</span></div>
+                    ${latestMilkHtml}
                     ${exitDetailsHtml}
                     
                     <div class="card-images">
@@ -398,6 +508,7 @@ function renderTable() {
                     </div>
                 </div>
                 <div class="card-footer">
+                    <button class="btn-detail" onclick="openAnimalDetail(${row.id})">📋 Detay</button>
                     <button class="btn-info" onclick="startEdit(${row.id})">✏️ Düzenle</button>
                     ${herdActionHtml}
                     <button class="btn-danger" onclick="deleteData(${row.id})">Kalıcı Sil</button>
@@ -410,21 +521,382 @@ function renderTable() {
     observeLazyCardImages(container);
 }
 
+window.openAnimalDetail = function (id) {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) return;
+    selectedAnimalId = numericId;
+    switchView('detailView', true, numericId);
+};
+
+function renderAnimalDetail(id) {
+    const container = document.getElementById('animalDetailContainer');
+    if (!container) return;
+
+    const animal = allDataById.get(Number(id));
+    if (!animal) {
+        container.innerHTML = `
+            <div class="card" style="text-align: center; padding: 2rem;">
+                <p style="color: #666; margin-bottom: 1rem;">Hayvan kaydı bulunamadı.</p>
+                <button class="btn-primary" style="max-width: 240px;" onclick="switchView('listView')">Hayvan Listesine Dön</button>
+            </div>
+        `;
+        return;
+    }
+
+    const isActive = !animal.herdStatus || animal.herdStatus === 'active';
+    const isFemale = animal.cinsiyet === 'Dişi';
+    const milking = isAnimalMilking(animal);
+    const exitLabels = { sold: 'Satıldı', dead: 'Öldü', transferred: 'Başka işletmeye geçti' };
+    const statusBadge = isActive
+        ? '<span class="card-badge">Aktif Sürüde</span>'
+        : `<span class="card-badge-exited">${escapeHtml(exitLabels[animal.herdStatus] || 'Sürüden çıktı')}</span>`;
+
+    const herdActionHtml = isActive
+        ? `<button class="btn-warning" onclick="markAnimalExited(${animal.id})">Sürüden Çıkar</button>`
+        : `<button class="btn-success" onclick="restoreAnimalToHerd(${animal.id})">Sürüye Geri Al</button>`;
+
+    const exitInfoItems = isActive ? '' : `
+        <div class="detail-info-item">
+            <span class="detail-info-label">Çıkış Nedeni</span>
+            <span class="detail-info-value">${escapeHtml(exitLabels[animal.herdStatus] || 'Sürüden çıktı')}</span>
+        </div>
+        <div class="detail-info-item">
+            <span class="detail-info-label">Çıkış Tarihi</span>
+            <span class="detail-info-value">${formatDateTR(animal.exitDate)}</span>
+        </div>
+        ${animal.herdStatus === 'sold' ? `
+            <div class="detail-info-item">
+                <span class="detail-info-label">Satış Fiyatı</span>
+                <span class="detail-info-value">${Number(animal.salePrice || 0).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</span>
+            </div>
+        ` : ''}
+    `;
+
+    const hayvanResmiHtml = animal.hayvanResmi
+        ? `<img src="${animal.hayvanResmi}" class="detail-img" decoding="async" onclick="openAnimalImage(${animal.id}, 'hayvanResmi')" title="Büyütmek için tıklayın">`
+        : '<div class="card-no-img" style="height: 190px;">Fotoğraf Yok</div>';
+    const anneResmiHtml = animal.anneResmi
+        ? `<img src="${animal.anneResmi}" class="detail-img" decoding="async" onclick="openAnimalImage(${animal.id}, 'anneResmi')" title="Büyütmek için tıklayın">`
+        : '<div class="card-no-img" style="height: 190px;">Fotoğraf Yok</div>';
+
+    let milkSectionHtml = '';
+    if (isFemale) {
+        const records = getMilkRecords(animal);
+        const today = getTodayDateString();
+        const todayRecord = records.find(r => r.date === today) || null;
+        const initialMorning = todayRecord && todayRecord.morning !== undefined && todayRecord.morning !== null ? todayRecord.morning : '';
+        const initialEvening = todayRecord && todayRecord.evening !== undefined && todayRecord.evening !== null ? todayRecord.evening : '';
+        const initialTotal = (Number(initialMorning) || 0) + (Number(initialEvening) || 0);
+
+        const latestRecord = records[0] || null;
+        const latestTotal = latestRecord ? (Number(latestRecord.morning) || 0) + (Number(latestRecord.evening) || 0) : 0;
+        const recent7 = records.slice(0, 7);
+        const avg7 = recent7.length
+            ? recent7.reduce((sum, r) => sum + (Number(r.morning) || 0) + (Number(r.evening) || 0), 0) / recent7.length
+            : 0;
+        const grandTotal = records.reduce((sum, r) => sum + (Number(r.morning) || 0) + (Number(r.evening) || 0), 0);
+
+        const historyHtml = records.length === 0
+            ? '<div class="milk-empty-state">Henüz süt kaydı girilmedi. Yukarıdaki alandan sabah ve akşam süt miktarlarını ekleyebilirsiniz.</div>'
+            : `<div class="milk-history-list">${records.map(rec => {
+                const m = Number(rec.morning) || 0;
+                const e = Number(rec.evening) || 0;
+                const total = m + e;
+                return `
+                    <div class="milk-history-item">
+                        <div class="milk-history-main">
+                            <span class="milk-history-date">📅 ${formatDateTR(rec.date)}</span>
+                            <div class="milk-history-values">
+                                <span>🌅 Sabah: <strong>${formatLiters(m)} L</strong></span>
+                                <span>🌇 Akşam: <strong>${formatLiters(e)} L</strong></span>
+                                <span class="milk-history-total">Toplam: ${formatLiters(total)} L</span>
+                            </div>
+                        </div>
+                        <div class="milk-history-actions">
+                            <button type="button" class="btn-info" onclick="editMilkRecord(${animal.id}, '${rec.date}')" title="Düzenle">✏️</button>
+                            <button type="button" class="btn-danger" onclick="deleteMilkRecord(${animal.id}, '${rec.date}')" title="Sil">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}</div>`;
+
+        milkSectionHtml = `
+            <div class="card">
+                <div class="milk-section-header">
+                    <h3>🥛 Günlük Süt Takibi</h3>
+                    <label class="milking-toggle-label">
+                        <input type="checkbox" id="detailMilkingToggle" ${milking ? 'checked' : ''} onchange="toggleAnimalMilking(${animal.id}, this.checked)">
+                        <span>Sağılır Hayvan</span>
+                    </label>
+                </div>
+
+                <form id="milkEntryForm" onsubmit="saveMilkRecord(event, ${animal.id})">
+                    <div class="milk-form-grid">
+                        <div class="form-group milk-date-group" style="margin-bottom: 0;">
+                            <label for="milkDate">Tarih</label>
+                            <input type="date" id="milkDate" value="${today}" required onchange="syncMilkFormForDate(${animal.id}, this.value)">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="milkMorning">🌅 Sabah Sütü (L)</label>
+                            <input type="number" id="milkMorning" min="0" step="0.1" inputmode="decimal" placeholder="Örn. 12.5" value="${initialMorning}" oninput="updateMilkTotalPreview()">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="milkEvening">🌇 Akşam Sütü (L)</label>
+                            <input type="number" id="milkEvening" min="0" step="0.1" inputmode="decimal" placeholder="Örn. 10.5" value="${initialEvening}" oninput="updateMilkTotalPreview()">
+                        </div>
+                    </div>
+
+                    <div class="milk-total-preview">
+                        <span>Seçili Gün Toplamı</span>
+                        <span id="milkDailyTotalPreview">${formatLiters(initialTotal)} Litre</span>
+                    </div>
+
+                    <button type="submit" class="btn-primary">💾 Süt Kaydını Kaydet</button>
+                </form>
+
+                <div class="milk-stats-grid">
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Son Kayıt</span>
+                        <span class="milk-stat-value">${latestRecord ? `${formatLiters(latestTotal)} L` : '-'}</span>
+                    </div>
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Son ${recent7.length || 7} Gün Ort.</span>
+                        <span class="milk-stat-value">${recent7.length ? `${formatLiters(avg7)} L` : '-'}</span>
+                    </div>
+                    <div class="milk-stat-card">
+                        <span class="milk-stat-label">Toplam (${records.length} gün)</span>
+                        <span class="milk-stat-value">${records.length ? `${formatLiters(grandTotal)} L` : '-'}</span>
+                    </div>
+                </div>
+
+                <h4 class="milk-history-title">Süt Geçmişi</h4>
+                ${historyHtml}
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="card">
+            <div class="detail-header">
+                <div>
+                    <h2>Küpe: ${escapeHtml(animal.kupeNo)}</h2>
+                    ${animal.hayvanLakabi ? `<p class="detail-subtitle">Lakap: ${escapeHtml(animal.hayvanLakabi)}</p>` : ''}
+                </div>
+                <div class="card-badges">
+                    ${milking ? '<span class="card-badge-milking">🥛 Sağılır</span>' : ''}
+                    ${statusBadge}
+                </div>
+            </div>
+
+            <div class="detail-info-grid">
+                <div class="detail-info-item">
+                    <span class="detail-info-label">Cinsiyet</span>
+                    <span class="detail-info-value">${escapeHtml(animal.cinsiyet || '-')}</span>
+                </div>
+                <div class="detail-info-item">
+                    <span class="detail-info-label">Irk</span>
+                    <span class="detail-info-value">${escapeHtml(animal.hayvanCinsi || '-')}</span>
+                </div>
+                <div class="detail-info-item">
+                    <span class="detail-info-label">Doğum Tarihi</span>
+                    <span class="detail-info-value">${formatDateTR(animal.dogumTarihi)}</span>
+                </div>
+                <div class="detail-info-item">
+                    <span class="detail-info-label">Koğuştuğu Tarih</span>
+                    <span class="detail-info-value">${formatDateTR(animal.kogustuguTarih)}</span>
+                </div>
+                <div class="detail-info-item">
+                    <span class="detail-info-label">Anne Küpe No</span>
+                    <span class="detail-info-value">${escapeHtml(animal.anneKupeNo || '-')}</span>
+                </div>
+                <div class="detail-info-item">
+                    <span class="detail-info-label">Annesinin Cinsi</span>
+                    <span class="detail-info-value">${escapeHtml(animal.anneCinsi || '-')}</span>
+                </div>
+                ${exitInfoItems}
+            </div>
+
+            <div class="detail-images">
+                <div class="detail-img-box">
+                    <p>Hayvan Resmi</p>
+                    ${hayvanResmiHtml}
+                </div>
+                <div class="detail-img-box">
+                    <p>Anne Resmi</p>
+                    ${anneResmiHtml}
+                </div>
+            </div>
+
+            <div class="detail-actions">
+                <button class="btn-info" onclick="startEdit(${animal.id})">✏️ Düzenle</button>
+                ${herdActionHtml}
+                <button class="btn-danger" onclick="deleteData(${animal.id})">Kalıcı Sil</button>
+            </div>
+        </div>
+        ${milkSectionHtml}
+    `;
+}
+
+function updateAnimalRecordInDB(updatedAnimal, onSuccess) {
+    const tx = db.transaction("kayitlar", "readwrite");
+    tx.objectStore("kayitlar").put(updatedAnimal);
+    tx.oncomplete = () => {
+        const idx = allData.findIndex(r => r.id === updatedAnimal.id);
+        if (idx !== -1) {
+            allData[idx] = updatedAnimal;
+        }
+        allDataById.set(updatedAnimal.id, updatedAnimal);
+        isListDirty = true;
+        if (onSuccess) onSuccess();
+    };
+}
+
+window.syncMilkFormForDate = function (animalId, dateStr) {
+    const animal = allDataById.get(Number(animalId));
+    const morningInput = document.getElementById('milkMorning');
+    const eveningInput = document.getElementById('milkEvening');
+    if (!animal || !morningInput || !eveningInput) return;
+
+    const existing = getMilkRecords(animal).find(r => r.date === dateStr);
+    morningInput.value = existing && existing.morning !== undefined && existing.morning !== null ? existing.morning : '';
+    eveningInput.value = existing && existing.evening !== undefined && existing.evening !== null ? existing.evening : '';
+    updateMilkTotalPreview();
+};
+
+window.updateMilkTotalPreview = function () {
+    const previewEl = document.getElementById('milkDailyTotalPreview');
+    if (!previewEl) return;
+    const morning = Number(document.getElementById('milkMorning')?.value) || 0;
+    const evening = Number(document.getElementById('milkEvening')?.value) || 0;
+    previewEl.innerText = `${formatLiters(morning + evening)} Litre`;
+};
+
+window.toggleAnimalMilking = function (id, checked) {
+    const animal = allDataById.get(Number(id));
+    if (!animal || animal.cinsiyet !== 'Dişi') return;
+
+    const updatedAnimal = {
+        ...animal,
+        isMilking: Boolean(checked)
+    };
+    updateAnimalRecordInDB(updatedAnimal, () => {
+        renderAnimalDetail(updatedAnimal.id);
+    });
+};
+
+window.saveMilkRecord = function (event, id) {
+    event.preventDefault();
+    const animal = allDataById.get(Number(id));
+    if (!animal || animal.cinsiyet !== 'Dişi') return;
+
+    const dateStr = document.getElementById('milkDate')?.value;
+    const rawMorning = document.getElementById('milkMorning')?.value.trim() ?? '';
+    const rawEvening = document.getElementById('milkEvening')?.value.trim() ?? '';
+
+    if (!dateStr) {
+        Swal.fire({ title: 'Uyarı', text: 'Lütfen tarih seçin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    if (rawMorning === '' && rawEvening === '') {
+        Swal.fire({ title: 'Uyarı', text: 'Lütfen sabah veya akşam süt miktarını girin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const morning = rawMorning === '' ? 0 : Number(rawMorning);
+    const evening = rawEvening === '' ? 0 : Number(rawEvening);
+
+    if (!Number.isFinite(morning) || morning < 0 || !Number.isFinite(evening) || evening < 0) {
+        Swal.fire({ title: 'Hata', text: 'Geçerli bir süt miktarı girin.', icon: 'error', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const existingRecords = getMilkRecords(animal).filter(r => r.date !== dateStr);
+    existingRecords.push({ date: dateStr, morning, evening });
+    existingRecords.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+    const shouldAutoMarkMilking = (morning > 0 || evening > 0) ? true : Boolean(animal.isMilking);
+    const updatedAnimal = {
+        ...animal,
+        isMilking: shouldAutoMarkMilking,
+        milkRecords: existingRecords
+    };
+
+    updateAnimalRecordInDB(updatedAnimal, () => {
+        renderAnimalDetail(updatedAnimal.id);
+        const dateInput = document.getElementById('milkDate');
+        if (dateInput) {
+            dateInput.value = dateStr;
+            syncMilkFormForDate(updatedAnimal.id, dateStr);
+        }
+        Swal.fire({
+            title: 'Kaydedildi!',
+            text: `${formatDateTR(dateStr)} tarihli günlük toplam: ${formatLiters(morning + evening)} Litre`,
+            icon: 'success',
+            timer: 1600,
+            showConfirmButton: false
+        });
+    });
+};
+
+window.editMilkRecord = function (id, dateStr) {
+    const dateInput = document.getElementById('milkDate');
+    if (!dateInput) return;
+    dateInput.value = dateStr;
+    syncMilkFormForDate(id, dateStr);
+    const formEl = document.getElementById('milkEntryForm');
+    if (formEl) {
+        formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+};
+
+window.deleteMilkRecord = function (id, dateStr) {
+    const animal = allDataById.get(Number(id));
+    if (!animal) return;
+
+    Swal.fire({
+        title: 'Süt kaydını sil?',
+        text: `${formatDateTR(dateStr)} tarihli süt kaydı silinecek.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Evet, Sil',
+        cancelButtonText: 'İptal'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const remaining = getMilkRecords(animal).filter(r => r.date !== dateStr);
+        const updatedAnimal = {
+            ...animal,
+            milkRecords: remaining
+        };
+        updateAnimalRecordInDB(updatedAnimal, () => {
+            renderAnimalDetail(updatedAnimal.id);
+        });
+    });
+};
+
 window.startEdit = function (rowOrId) {
     const row = typeof rowOrId === 'object' && rowOrId !== null ? rowOrId : allDataById.get(Number(rowOrId));
     if (!row) return;
+
+    editReturnView = currentView === 'detailView' ? 'detailView' : 'listView';
 
     // Listede düzenleye basıldığında otomatik form ekranına yönlendir
     switchView('addView');
 
     document.getElementById('formTitle').innerText = "Kayıt Düzenle";
     document.getElementById('submitBtn').innerText = "Güncelle";
-    document.getElementById('cancelEditBtn').style.display = "block";
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    cancelBtn.style.display = "block";
+    cancelBtn.innerText = editReturnView === 'detailView' ? "İptal Et ve Detaya Dön" : "İptal Et ve Listeye Dön";
 
     document.getElementById('editId').value = row.id;
     document.getElementById('kupeNo').value = row.kupeNo;
     document.getElementById('hayvanLakabi').value = row.hayvanLakabi || "";
     document.getElementById('cinsiyet').value = row.cinsiyet;
+    document.getElementById('isMilking').checked = isAnimalMilking(row);
+    toggleMilkingFormField();
     document.getElementById('hayvanCinsi').value = row.hayvanCinsi;
     document.getElementById('dogumTarihi').value = row.dogumTarihi;
     document.getElementById('anneKupeNo').value = row.anneKupeNo;
@@ -456,14 +928,15 @@ window.startEdit = function (rowOrId) {
     }
 };
 
-window.cancelEdit = function () {
-    const isEditing = document.getElementById('editId').value !== "";
-    
+function resetAnimalForm() {
     document.getElementById('animalForm').reset();
     document.getElementById('editId').value = "";
     document.getElementById('formTitle').innerText = "Yeni Hayvan Ekle";
     document.getElementById('submitBtn').innerText = "Kaydet";
     document.getElementById('cancelEditBtn').style.display = "none";
+    document.getElementById('cancelEditBtn').innerText = "İptal Et ve Listeye Dön";
+    document.getElementById('isMilking').checked = false;
+    toggleMilkingFormField();
 
     document.getElementById('previewHayvan').style.display = 'none';
     document.getElementById('previewAnne').style.display = 'none';
@@ -472,10 +945,24 @@ window.cancelEdit = function () {
 
     base64Hayvan = "";
     base64Anne = "";
+    editReturnView = 'listView';
+}
 
-    // Eğer düzenlemeden iptale basıldıysa, listeye geri dön
+window.cancelEdit = function () {
+    const editId = document.getElementById('editId').value;
+    const isEditing = editId !== "";
+    const targetView = editReturnView;
+    const editedId = Number(editId);
+
+    resetAnimalForm();
+
+    // Eğer düzenlemeden iptale basıldıysa, önceki ekrana geri dön
     if (isEditing) {
-        switchView('listView');
+        if (targetView === 'detailView' && editedId) {
+            openAnimalDetail(editedId);
+        } else {
+            switchView('listView');
+        }
     }
 };
 
@@ -491,9 +978,14 @@ window.deleteData = function (id) {
         cancelButtonText: 'İptal'
     }).then((result) => {
         if (result.isConfirmed) {
+            const wasInDeletedDetail = currentView === 'detailView' && Number(selectedAnimalId) === Number(id);
             const tx = db.transaction("kayitlar", "readwrite");
             tx.objectStore("kayitlar").delete(id);
             tx.oncomplete = () => {
+                if (wasInDeletedDetail) {
+                    selectedAnimalId = null;
+                    switchView('listView');
+                }
                 loadData();
                 Swal.fire({
                     title: 'Silindi!',
@@ -899,6 +1391,7 @@ window.applyFilter = function () {
     const filterCinsiyet = document.getElementById('filterCinsiyet').value;
     const filterIrk = document.getElementById('filterIrk').value;
     const filterHerdStatus = document.getElementById('filterHerdStatus').value;
+    const filterMilking = document.getElementById('filterMilking').value;
     
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
@@ -913,6 +1406,10 @@ window.applyFilter = function () {
         const matchesHerdStatus = filterHerdStatus === 'all' ||
             (filterHerdStatus === 'active' && isActive) ||
             (filterHerdStatus === 'exited' && !isActive);
+        const milking = isAnimalMilking(row);
+        const matchesMilking = filterMilking === '' ||
+            (filterMilking === 'milking' && milking) ||
+            (filterMilking === 'non-milking' && !milking);
 
         let matchesDate = true;
         if (startDate || endDate) {
@@ -924,7 +1421,7 @@ window.applyFilter = function () {
             }
         }
 
-        return matchesSearch && matchesCinsiyet && matchesIrk && matchesDate && matchesHerdStatus;
+        return matchesSearch && matchesCinsiyet && matchesIrk && matchesDate && matchesHerdStatus && matchesMilking;
     });
     
     const totalCountEl = document.getElementById('totalCount');
@@ -940,6 +1437,7 @@ window.clearSearch = function () {
     document.getElementById('filterCinsiyet').value = '';
     document.getElementById('filterIrk').value = '';
     document.getElementById('filterHerdStatus').value = 'active';
+    document.getElementById('filterMilking').value = '';
     document.getElementById('startDate').value = '';
     document.getElementById('endDate').value = '';
     

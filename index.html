@@ -79,11 +79,18 @@
                         </div>
                         <div class="form-group">
                             <label>Cinsiyeti</label>
-                            <select id="cinsiyet" required>
+                            <select id="cinsiyet" required onchange="toggleMilkingFormField()">
                                 <option value="">Seçiniz...</option>
                                 <option value="Erkek">Erkek</option>
                                 <option value="Dişi">Dişi</option>
                             </select>
+                        </div>
+                        <div class="form-group" id="milkingFormGroup" style="display: none;">
+                            <label>Sağım Durumu</label>
+                            <label class="checkbox-label" for="isMilking">
+                                <input type="checkbox" id="isMilking">
+                                <span>🥛 Sağılır Hayvan</span>
+                            </label>
                         </div>
                         <div class="form-group">
                             <label>Hayvanın Cinsi (Irkı)</label>
@@ -181,6 +188,11 @@
             <option value="exited">Sürüden Çıkanlar</option>
             <option value="all">Tüm Kayıtlar</option>
         </select>
+        <select id="filterMilking" onchange="applyFilter()">
+            <option value="">Sağım: Tümü</option>
+            <option value="milking">🥛 Sağılır Hayvanlar</option>
+            <option value="non-milking">Sağılmayanlar</option>
+        </select>
     </div>
 
     <!-- YENİ: Tarih Filtreleri -->
@@ -198,6 +210,14 @@
     
   <div id="cardContainer" class="animal-cards-grid"></div>
 </div>
+
+        <!-- 3.5. BÖLÜM: HAYVAN DETAY SAYFASI -->
+        <div id="detailView" class="view-section">
+            <div class="detail-top-bar">
+                <button type="button" class="btn-secondary detail-back-btn" onclick="switchView('listView')">← Hayvan Listesine Dön</button>
+            </div>
+            <div id="animalDetailContainer"></div>
+        </div>
 
         <!-- 4. BÖLÜM: AKTARIM VE YEDEKLEME -->
         <div id="syncView" class="view-section">
