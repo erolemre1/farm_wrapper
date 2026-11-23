@@ -560,6 +560,8 @@
     flex-direction: column;
     transition: transform 0.2s, box-shadow 0.2s;
     border: 1px solid #e9ecef;
+    content-visibility: auto;
+    contain-intrinsic-size: 420px;
 }
 
 .animal-card:hover {
@@ -639,6 +641,15 @@
 
 .card-img:hover {
     opacity: 0.8;
+}
+
+.card-img-slot {
+    width: 100%;
+    height: 120px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    background: #f4f4f9;
 }
 
 .card-no-img {

@@ -11,6 +11,18 @@ const routeViews = Object.fromEntries(
     Object.entries(viewRoutes).map(([viewId, route]) => [route, viewId])
 );
 
+let db;
+let base64Hayvan = "";
+let base64Anne = "";
+let allData = [];
+let allDataById = new Map();
+let filteredData = [];
+let currentView = null;
+let isDataLoaded = false;
+let isDataLoading = false;
+let isListDirty = true;
+let imageObserver = null;
+
 if (sessionStorage.getItem("loggedIn") === "true") {
     showApp();
 }
@@ -43,6 +55,9 @@ function showApp() {
     const initialRoute = viewRoutes[initialView];
     history.replaceState({ appView: initialView }, '', `${window.location.pathname}${window.location.search}#${initialRoute}`);
     switchView(initialView, false);
+    if (db && !isDataLoaded && !isDataLoading) {
+        loadData();
+    }
 }
 
 function handleEnter(e) {
@@ -52,10 +67,11 @@ function handleEnter(e) {
 }
 
 // YENİ: Ekranlar Arası Geçiş Fonksiyonu
-// YENİ: Ekranlar Arası Geçiş Fonksiyonu
 function switchView(viewId, updateHistory = true) {
     const route = viewRoutes[viewId];
     if (!route) return;
+
+    currentView = viewId;
 
     if (updateHistory && window.location.hash !== `#${route}`) {
         history.pushState({ appView: viewId }, '', `#${route}`);
@@ -79,18 +95,29 @@ function switchView(viewId, updateHistory = true) {
 
     // 4. Sayfayı en üste kaydır
     window.scrollTo(0, 0);
+
+    // 5. Liste ekranı açıldığında verileri/kartları tembel yükle
+    if (viewId === 'listView') {
+        if (!isDataLoaded) {
+            const container = document.getElementById('cardContainer');
+            if (container && !container.innerHTML) {
+                container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #666; font-style: italic; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Kayıtlar yükleniyor...</div>`;
+            }
+            if (db && !isDataLoading) {
+                loadData();
+            }
+        } else if (isListDirty) {
+            applyFilter();
+        } else {
+            observeLazyCardImages(document.getElementById('cardContainer'));
+        }
+    }
 }
 
 window.addEventListener('popstate', (event) => {
     const viewId = routeViews[window.location.hash.slice(1)] || event.state?.appView || 'homeView';
     switchView(viewId, false);
 });
-
-let db;
-let base64Hayvan = "";
-let base64Anne = "";
-let allData = [];
-let filteredData = [];
 
 const request = indexedDB.open("CiftlikPro", 1);
 request.onupgradeneeded = (e) => {
@@ -101,7 +128,9 @@ request.onupgradeneeded = (e) => {
 };
 request.onsuccess = (e) => {
     db = e.target.result;
-    loadData();
+    if (sessionStorage.getItem("loggedIn") === "true" && !isDataLoaded && !isDataLoading) {
+        loadData();
+    }
 };
 
 function handleImageUpload(inputId, previewId, isAnne) {
@@ -235,44 +264,103 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
 });
 
 function loadData() {
+    if (!db) return;
+    isDataLoading = true;
     const tx = db.transaction("kayitlar", "readonly");
-    const request = tx.objectStore("kayitlar").getAll();
+    const req = tx.objectStore("kayitlar").getAll();
 
-    request.onsuccess = () => {
-        allData = request.result.sort((a, b) => a.id - b.id);
+    req.onsuccess = () => {
+        isDataLoading = false;
+        isDataLoaded = true;
+        isListDirty = true;
+        allData = req.result.sort((a, b) => a.id - b.id);
+        allDataById = new Map(allData.map(row => [row.id, row]));
         const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
         document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
-        applyFilter();
+        if (currentView === 'listView') {
+            applyFilter();
+        }
+    };
+    req.onerror = () => {
+        isDataLoading = false;
     };
 }
 
-window.applyFilter = function () {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    filteredData = allData.filter(row => {
-        const kupe = (row.kupeNo || "").toLowerCase();
-        const cins = (row.hayvanCinsi || "").toLowerCase();
-        const lakap = (row.hayvanLakabi || "").toLowerCase();
-        return kupe.includes(searchTerm) || cins.includes(searchTerm) || lakap.includes(searchTerm);
+function hydrateCardImages(card) {
+    const slots = card.querySelectorAll('.card-img-slot');
+    slots.forEach(slot => {
+        const animal = allDataById.get(Number(slot.dataset.id));
+        const field = slot.dataset.field;
+        const src = animal ? animal[field] : '';
+        if (!src) return;
+
+        const img = document.createElement('img');
+        img.className = 'card-img';
+        img.decoding = 'async';
+        img.src = src;
+        img.onclick = () => openModal(src);
+        slot.replaceWith(img);
     });
-    renderTable();
+    card.removeAttribute('data-has-lazy');
+}
+
+function observeLazyCardImages(container) {
+    if (imageObserver) {
+        imageObserver.disconnect();
+        imageObserver = null;
+    }
+    if (!container) return;
+
+    const lazyCards = container.querySelectorAll('.animal-card[data-has-lazy="1"]');
+    if (!lazyCards.length) return;
+
+    if ('IntersectionObserver' in window) {
+        imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    hydrateCardImages(entry.target);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '300px 0px' });
+
+        lazyCards.forEach(card => imageObserver.observe(card));
+    } else {
+        lazyCards.forEach(hydrateCardImages);
+    }
+}
+
+window.openAnimalImage = function (id, field) {
+    const animal = allDataById.get(Number(id));
+    if (!animal || !animal[field]) return;
+    openModal(animal[field]);
 };
 
 function renderTable() {
     // Artık tablo tbody yerine, kartları koyacağımız div'i seçiyoruz
     const container = document.getElementById('cardContainer');
-    container.innerHTML = "";
+
+    if (imageObserver) {
+        imageObserver.disconnect();
+        imageObserver = null;
+    }
 
     if (filteredData.length === 0) {
         container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #666; font-style: italic; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Aradığınız kriterlere uygun hayvan bulunamadı.</div>`;
         return;
     }
 
-    filteredData.forEach((row, index) => {
-        // Resim varsa göster, yoksa gri "Fotoğraf Yok" kutusu oluştur
-        const hayvanResmiHtml = row.hayvanResmi ? `<img src="${row.hayvanResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
-        const anneResmiHtml = row.anneResmi ? `<img src="${row.anneResmi}" class="card-img" onclick="openModal(this.src)">` : '<div class="card-no-img">Fotoğraf Yok</div>';
+    const exitLabels = { sold: 'Satıldı', dead: 'Öldü', transferred: 'Başka işletmeye geçti' };
+    const htmlParts = filteredData.map((row, index) => {
+        // Resim varsa ekrana geldiğinde yüklenmesi için hafif yer tutucu ekle
+        const hayvanResmiHtml = row.hayvanResmi
+            ? `<div class="card-img-slot" data-id="${row.id}" data-field="hayvanResmi" onclick="openAnimalImage(${row.id}, 'hayvanResmi')"></div>`
+            : '<div class="card-no-img">Fotoğraf Yok</div>';
+        const anneResmiHtml = row.anneResmi
+            ? `<div class="card-img-slot" data-id="${row.id}" data-field="anneResmi" onclick="openAnimalImage(${row.id}, 'anneResmi')"></div>`
+            : '<div class="card-no-img">Fotoğraf Yok</div>';
+        const hasLazyImages = Boolean(row.hayvanResmi || row.anneResmi);
         const isActive = !row.herdStatus || row.herdStatus === 'active';
-        const exitLabels = { sold: 'Satıldı', dead: 'Öldü', transferred: 'Başka işletmeye geçti' };
         const exitDetailsHtml = isActive ? '' : `
             <div class="card-info-row"><strong>Durum:</strong> <span>${exitLabels[row.herdStatus] || 'Sürüden çıktı'}</span></div>
             <div class="card-info-row"><strong>Çıkış Tarihi:</strong> <span>${row.exitDate || '-'}</span></div>
@@ -283,8 +371,8 @@ function renderTable() {
             : `<button class="btn-success" onclick="restoreAnimalToHerd(${row.id})">Sürüye Geri Al</button>`;
 
         // Kart şablonu
-        container.innerHTML += `
-            <div class="animal-card">
+        return `
+            <div class="animal-card"${hasLazyImages ? ' data-has-lazy="1"' : ''}>
                 <div class="card-header">
                     <h3>Küpe: ${row.kupeNo}</h3>
                     <span class="card-badge">#${index + 1}</span>
@@ -310,16 +398,22 @@ function renderTable() {
                     </div>
                 </div>
                 <div class="card-footer">
-                    <button class="btn-info" onclick='startEdit(${JSON.stringify(row)})'>✏️ Düzenle</button>
+                    <button class="btn-info" onclick="startEdit(${row.id})">✏️ Düzenle</button>
                     ${herdActionHtml}
                     <button class="btn-danger" onclick="deleteData(${row.id})">Kalıcı Sil</button>
                 </div>
             </div>
         `;
     });
+
+    container.innerHTML = htmlParts.join('');
+    observeLazyCardImages(container);
 }
 
-window.startEdit = function (row) {
+window.startEdit = function (rowOrId) {
+    const row = typeof rowOrId === 'object' && rowOrId !== null ? rowOrId : allDataById.get(Number(rowOrId));
+    if (!row) return;
+
     // Listede düzenleye basıldığında otomatik form ekranına yönlendir
     switchView('addView');
 
@@ -837,6 +931,7 @@ window.applyFilter = function () {
     const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
     totalCountEl.innerText = `Sürüde: ${activeCount} | Gösterilen: ${filteredData.length}`;
     
+    isListDirty = false;
     renderTable();
 };
 
