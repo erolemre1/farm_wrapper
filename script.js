@@ -7,6 +7,7 @@ const viewRoutes = {
     detailView: 'animal-detail',
     milkView: 'milk',
     bulkHealthView: 'bulk-health',
+    financeView: 'finance',
     syncView: 'sync'
 };
 
@@ -19,6 +20,8 @@ let base64Hayvan = "";
 let base64Anne = "";
 let allData = [];
 let allDataById = new Map();
+let financeData = [];
+let farmSettings = { milkUnitPrice: 0 };
 let filteredData = [];
 let currentView = null;
 let selectedAnimalId = null;
@@ -26,6 +29,8 @@ let activeDetailTab = 'general';
 let editReturnView = 'listView';
 let bulkMilkDate = null;
 let milkChartRange = 7;
+let financeSelectedMonth = null;
+let financeFormFlow = 'expense';
 let isDataLoaded = false;
 let isDataLoading = false;
 let isListDirty = true;
@@ -189,6 +194,18 @@ function switchView(viewId, updateHistory = true, animalId = null) {
         } else {
             renderBulkHealthView();
         }
+    } else if (viewId === 'financeView') {
+        if (!isDataLoaded) {
+            const financeContainer = document.getElementById('financeContainer');
+            if (financeContainer) {
+                financeContainer.innerHTML = `<div class="card" style="text-align: center; color: #666; font-style: italic;">Finans verileri yükleniyor...</div>`;
+            }
+            if (db && !isDataLoading) {
+                loadData();
+            }
+        } else {
+            renderFinanceView();
+        }
     }
 }
 
@@ -199,11 +216,17 @@ window.addEventListener('popstate', (event) => {
     switchView(viewId, false, animalId);
 });
 
-const request = indexedDB.open("CiftlikPro", 1);
+const request = indexedDB.open("CiftlikPro", 2);
 request.onupgradeneeded = (e) => {
     db = e.target.result;
     if (!db.objectStoreNames.contains("kayitlar")) {
         db.createObjectStore("kayitlar", { keyPath: "id", autoIncrement: true });
+    }
+    if (!db.objectStoreNames.contains("finans")) {
+        db.createObjectStore("finans", { keyPath: "id", autoIncrement: true });
+    }
+    if (!db.objectStoreNames.contains("ayarlar")) {
+        db.createObjectStore("ayarlar", { keyPath: "key" });
     }
 };
 request.onsuccess = (e) => {
@@ -704,15 +727,39 @@ function getAnimalAgeGroup(animal) {
 function loadData() {
     if (!db) return;
     isDataLoading = true;
-    const tx = db.transaction("kayitlar", "readonly");
-    const req = tx.objectStore("kayitlar").getAll();
+    const storeNames = ["kayitlar"];
+    if (db.objectStoreNames.contains("finans")) storeNames.push("finans");
+    if (db.objectStoreNames.contains("ayarlar")) storeNames.push("ayarlar");
 
-    req.onsuccess = () => {
+    const tx = db.transaction(storeNames, "readonly");
+    const animalsReq = tx.objectStore("kayitlar").getAll();
+    const financeReq = storeNames.includes("finans") ? tx.objectStore("finans").getAll() : null;
+    const settingsReq = storeNames.includes("ayarlar") ? tx.objectStore("ayarlar").getAll() : null;
+
+    let loadedAnimals = [];
+    let loadedFinance = [];
+    let loadedSettings = [];
+
+    animalsReq.onsuccess = () => { loadedAnimals = animalsReq.result || []; };
+    if (financeReq) financeReq.onsuccess = () => { loadedFinance = financeReq.result || []; };
+    if (settingsReq) settingsReq.onsuccess = () => { loadedSettings = settingsReq.result || []; };
+
+    tx.oncomplete = () => {
         isDataLoading = false;
         isDataLoaded = true;
         isListDirty = true;
-        allData = req.result.sort((a, b) => a.id - b.id);
+        allData = loadedAnimals.sort((a, b) => a.id - b.id);
         allDataById = new Map(allData.map(row => [row.id, row]));
+        financeData = loadedFinance.sort((a, b) => {
+            const cmp = String(b.date || '').localeCompare(String(a.date || ''));
+            return cmp !== 0 ? cmp : (b.id || 0) - (a.id || 0);
+        });
+        const nextSettings = { milkUnitPrice: 0 };
+        loadedSettings.forEach(item => {
+            if (item && item.key) nextSettings[item.key] = item.value;
+        });
+        farmSettings = nextSettings;
+
         const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
         document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
         renderHomeHerdStats();
@@ -727,9 +774,11 @@ function loadData() {
             renderMilkView();
         } else if (currentView === 'bulkHealthView') {
             renderBulkHealthView();
+        } else if (currentView === 'financeView') {
+            renderFinanceView();
         }
     };
-    req.onerror = () => {
+    tx.onerror = () => {
         isDataLoading = false;
     };
 }
@@ -2157,6 +2206,502 @@ window.saveBulkHealthRecords = function (event) {
     });
 };
 
+const FINANCE_EXPENSE_CATEGORIES = [
+    { key: 'yem', label: '🌾 Kesif Yem' },
+    { key: 'kaba-yem', label: '🌿 Saman / Yonca / Silaj' },
+    { key: 'elektrik-su', label: '⚡ Elektrik / Su / Yakıt' },
+    { key: 'iscilik', label: '👷 İşçilik' },
+    { key: 'veteriner', label: '🩺 Veteriner / Genel İlaç' },
+    { key: 'bakim', label: '🔧 Bakım / Ekipman' },
+    { key: 'diger-gider', label: '📦 Diğer Gider' }
+];
+
+const FINANCE_INCOME_CATEGORIES = [
+    { key: 'destekleme', label: '🏛️ Destekleme Geliri' },
+    { key: 'gubre', label: '🌱 Gübre Satışı' },
+    { key: 'sut-satis', label: '🥛 Ek Süt / Peynir Geliri' },
+    { key: 'diger-gelir', label: '💵 Diğer Gelir' }
+];
+
+function getFinanceCategoryLabel(flow, key) {
+    const list = flow === 'income' ? FINANCE_INCOME_CATEGORIES : FINANCE_EXPENSE_CATEGORIES;
+    return list.find(c => c.key === key)?.label || key || '-';
+}
+
+function formatTRY(amount) {
+    const num = Number(amount) || 0;
+    return `${num.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
+}
+
+function matchesFinancePeriod(dateStr, periodMonth) {
+    if (!periodMonth) return true;
+    return String(dateStr || '').startsWith(periodMonth);
+}
+
+function computeFinanceSummary(periodMonth) {
+    const milkUnitPrice = Number(farmSettings.milkUnitPrice) || 0;
+    let totalMilkLiters = 0;
+    let animalSalesIncome = 0;
+    let animalSalesCount = 0;
+    let animalHealthExpense = 0;
+    let animalHealthCount = 0;
+
+    allData.forEach(animal => {
+        if (animal.cinsiyet === 'Dişi') {
+            getMilkRecords(animal).forEach(rec => {
+                if (!matchesFinancePeriod(rec.date, periodMonth)) return;
+                totalMilkLiters += (Number(rec.morning) || 0) + (Number(rec.evening) || 0);
+            });
+        }
+        if (animal.herdStatus === 'sold' && matchesFinancePeriod(animal.exitDate, periodMonth)) {
+            animalSalesIncome += Number(animal.salePrice) || 0;
+            animalSalesCount += 1;
+        }
+        getHealthRecords(animal).forEach(rec => {
+            if (!matchesFinancePeriod(rec.date, periodMonth)) return;
+            const c = Number(rec.cost) || 0;
+            if (c > 0) {
+                animalHealthExpense += c;
+                animalHealthCount += 1;
+            }
+        });
+    });
+
+    const estimatedMilkIncome = totalMilkLiters * milkUnitPrice;
+
+    const periodTransactions = financeData.filter(tx => matchesFinancePeriod(tx.date, periodMonth));
+    let manualIncome = 0;
+    let manualExpense = 0;
+    const expenseByCategory = new Map();
+
+    if (animalHealthExpense > 0) {
+        expenseByCategory.set('💉 Hayvan Sağlık & Aşı', animalHealthExpense);
+    }
+
+    periodTransactions.forEach(tx => {
+        const amt = Number(tx.amount) || 0;
+        if (tx.flow === 'income') {
+            manualIncome += amt;
+        } else {
+            manualExpense += amt;
+            const catLabel = getFinanceCategoryLabel('expense', tx.category);
+            expenseByCategory.set(catLabel, (expenseByCategory.get(catLabel) || 0) + amt);
+        }
+    });
+
+    const totalIncome = estimatedMilkIncome + animalSalesIncome + manualIncome;
+    const totalExpense = animalHealthExpense + manualExpense;
+    const netBalance = totalIncome - totalExpense;
+    const expenseBreakdown = Array.from(expenseByCategory.entries())
+        .map(([label, amount]) => ({ label, amount }))
+        .sort((a, b) => b.amount - a.amount);
+
+    return {
+        milkUnitPrice,
+        totalMilkLiters,
+        estimatedMilkIncome,
+        animalSalesIncome,
+        animalSalesCount,
+        animalHealthExpense,
+        animalHealthCount,
+        manualIncome,
+        manualExpense,
+        totalIncome,
+        totalExpense,
+        netBalance,
+        expenseBreakdown,
+        periodTransactions
+    };
+}
+
+function renderFinanceView() {
+    const container = document.getElementById('financeContainer');
+    if (!container) return;
+
+    const currentMonth = getTodayDateString().slice(0, 7);
+    if (financeSelectedMonth === null) {
+        financeSelectedMonth = currentMonth;
+    }
+
+    const summary = computeFinanceSummary(financeSelectedMonth);
+    const today = getTodayDateString();
+    const isAllTime = financeSelectedMonth === '';
+    const periodLabel = isAllTime ? 'Tüm Zamanlar' : `${financeSelectedMonth.slice(5, 7)}.${financeSelectedMonth.slice(0, 4)}`;
+    const activeCategories = financeFormFlow === 'income' ? FINANCE_INCOME_CATEGORIES : FINANCE_EXPENSE_CATEGORIES;
+
+    const categoryBarsHtml = summary.expenseBreakdown.length === 0
+        ? '<div class="milk-empty-state" style="padding: 0.9rem;">Bu dönemde henüz gider kaydı bulunmuyor.</div>'
+        : `<div class="finance-cat-bars">${summary.expenseBreakdown.map(item => {
+            const pct = summary.totalExpense > 0 ? Math.round((item.amount / summary.totalExpense) * 100) : 0;
+            return `
+                <div class="finance-cat-bar-row">
+                    <div class="finance-cat-bar-meta">
+                        <span>${escapeHtml(item.label)}</span>
+                        <span>${formatTRY(item.amount)} (%${pct})</span>
+                    </div>
+                    <div class="finance-cat-bar-track">
+                        <div class="finance-cat-bar-fill" style="width: ${pct}%"></div>
+                    </div>
+                </div>
+            `;
+        }).join('')}</div>`;
+
+    const txListHtml = summary.periodTransactions.length === 0
+        ? '<div class="milk-empty-state">Seçili dönem için manuel gelir/gider kaydı bulunmuyor.</div>'
+        : `<div class="milk-history-list">${summary.periodTransactions.map(tx => {
+            const isIncome = tx.flow === 'income';
+            const sign = isIncome ? '+' : '-';
+            return `
+                <div class="finance-tx-item ${isIncome ? 'is-income' : ''}">
+                    <div class="milk-history-main">
+                        <span class="milk-history-date">${escapeHtml(getFinanceCategoryLabel(tx.flow, tx.category))} — ${escapeHtml(tx.title)}</span>
+                        <div class="milk-history-values">
+                            <span>📅 ${formatDateTR(tx.date)}</span>
+                            ${tx.notes ? `<span>📝 ${escapeHtml(tx.notes)}</span>` : ''}
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="finance-tx-amount">${sign}${formatTRY(tx.amount)}</span>
+                        <div class="milk-history-actions">
+                            <button type="button" class="btn-info" onclick="editFinanceTransaction(${tx.id})" title="Düzenle">✏️</button>
+                            <button type="button" class="btn-danger" onclick="deleteFinanceTransaction(${tx.id})" title="Sil">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('')}</div>`;
+
+    container.innerHTML = `
+        <div class="card">
+            <div class="chart-header-bar">
+                <h3>💰 Çiftlik Gelir-Gider (Kasa) — ${periodLabel}</h3>
+                <button type="button" class="btn-info" style="margin: 0; padding: 0.45rem 0.8rem;" onclick="exportFinanceCSV()">📊 CSV İndir</button>
+            </div>
+
+            <div class="finance-period-bar">
+                <input type="month" id="financeMonthInput" value="${financeSelectedMonth}" onchange="setFinancePeriod(this.value)">
+                <button type="button" class="${financeSelectedMonth === currentMonth ? 'active' : ''}" onclick="setFinancePeriod('${currentMonth}')">Bu Ay</button>
+                <button type="button" class="${isAllTime ? 'active' : ''}" onclick="setFinancePeriod('')">Tüm Zamanlar</button>
+            </div>
+
+            <form class="milk-price-row" onsubmit="saveMilkUnitPrice(event)">
+                <div class="form-group">
+                    <label for="milkUnitPriceInput">🥛 Süt Litre Birim Fiyatı (TL/Litre)</label>
+                    <input type="number" id="milkUnitPriceInput" min="0" step="0.05" inputmode="decimal" placeholder="Örn. 17.50" value="${summary.milkUnitPrice > 0 ? summary.milkUnitPrice : ''}">
+                </div>
+                <button type="submit" class="btn-primary" style="width: auto;">Fiyatı Kaydet</button>
+            </form>
+
+            <div class="finance-kpi-grid">
+                <div class="finance-kpi-card kpi-income">
+                    <span class="finance-kpi-label">Toplam Gelir</span>
+                    <span class="finance-kpi-value">${formatTRY(summary.totalIncome)}</span>
+                </div>
+                <div class="finance-kpi-card kpi-expense">
+                    <span class="finance-kpi-label">Toplam Gider</span>
+                    <span class="finance-kpi-value">${formatTRY(summary.totalExpense)}</span>
+                </div>
+                <div class="finance-kpi-card ${summary.netBalance >= 0 ? 'kpi-net-positive' : 'kpi-net-negative'}">
+                    <span class="finance-kpi-label">Net Kâr / Zarar</span>
+                    <span class="finance-kpi-value">${summary.netBalance > 0 ? '+' : ''}${formatTRY(summary.netBalance)}</span>
+                </div>
+            </div>
+
+            <div class="finance-breakdown-grid">
+                <div class="finance-breakdown-box">
+                    <h4>📈 Gelir Dağılımı</h4>
+                    <div class="finance-breakdown-row">
+                        <span>🥛 Tahmini Süt Geliri (${formatLiters(summary.totalMilkLiters)} L)</span>
+                        <strong>${formatTRY(summary.estimatedMilkIncome)}</strong>
+                    </div>
+                    <div class="finance-breakdown-row">
+                        <span>🐄 Hayvan Satışları (${summary.animalSalesCount} adet)</span>
+                        <strong>${formatTRY(summary.animalSalesIncome)}</strong>
+                    </div>
+                    <div class="finance-breakdown-row">
+                        <span>💵 Manuel Ek Gelirler</span>
+                        <strong>${formatTRY(summary.manualIncome)}</strong>
+                    </div>
+                </div>
+                <div class="finance-breakdown-box">
+                    <h4>📉 Gider Dağılımı</h4>
+                    <div class="finance-breakdown-row">
+                        <span>💉 Hayvan Sağlık & Aşı (${summary.animalHealthCount} işlem)</span>
+                        <strong>${formatTRY(summary.animalHealthExpense)}</strong>
+                    </div>
+                    <div class="finance-breakdown-row">
+                        <span>🌾 Çiftlik Genel Giderleri</span>
+                        <strong>${formatTRY(summary.manualExpense)}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="milk-history-title">Gider Kategorileri Dağılımı</h4>
+            ${categoryBarsHtml}
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0; color: #0056b3;">➕ Gelir / Gider Kaydı Ekle</h3>
+            <div class="finance-flow-tabs">
+                <button type="button" class="finance-flow-btn ${financeFormFlow === 'expense' ? 'active-expense' : ''}" onclick="setFinanceFormFlow('expense')">📉 Gider Ekle</button>
+                <button type="button" class="finance-flow-btn ${financeFormFlow === 'income' ? 'active-income' : ''}" onclick="setFinanceFormFlow('income')">📈 Gelir Ekle</button>
+            </div>
+
+            <div class="health-presets">
+                <button type="button" class="health-preset-chip" onclick="applyFinancePreset('expense', 'yem', 'Süt / Besi Yemi Alımı')">🌾 Yem</button>
+                <button type="button" class="health-preset-chip" onclick="applyFinancePreset('expense', 'kaba-yem', 'Saman / Yonca Alımı')">🌿 Saman/Yonca</button>
+                <button type="button" class="health-preset-chip" onclick="applyFinancePreset('expense', 'elektrik-su', 'Elektrik / Su Faturası')">⚡ Elektrik/Su</button>
+                <button type="button" class="health-preset-chip" onclick="applyFinancePreset('expense', 'iscilik', 'İşçilik Ödemesi')">👷 İşçilik</button>
+                <button type="button" class="health-preset-chip" onclick="applyFinancePreset('expense', 'bakim', 'Ahır / Ekipman Bakımı')">🔧 Bakım</button>
+                <button type="button" class="health-preset-chip" onclick="applyFinancePreset('income', 'destekleme', 'Buzağı / Süt Desteklemesi')">🏛️ Destekleme</button>
+            </div>
+
+            <form id="financeEntryForm" onsubmit="saveFinanceTransaction(event)">
+                <input type="hidden" id="financeEditId" value="">
+                <div class="health-form-grid">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="financeCategory">Kategori</label>
+                        <select id="financeCategory" required>
+                            ${activeCategories.map(c => `<option value="${c.key}">${c.label}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="financeDate">Tarih</label>
+                        <input type="date" id="financeDate" value="${today}" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="financeTitle">Açıklama</label>
+                        <input type="text" id="financeTitle" placeholder="Örn. 20 çuval süt yemi" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="financeAmount">Tutar (TL)</label>
+                        <input type="number" id="financeAmount" min="0.01" step="0.01" inputmode="decimal" placeholder="Örn. 12500" required>
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="financeNotes">Not (İsteğe Bağlı)</label>
+                        <input type="text" id="financeNotes" placeholder="Tedarikçi, fatura veya kısa not...">
+                    </div>
+                </div>
+                <div class="health-form-actions">
+                    <button type="submit" id="financeSubmitBtn" class="btn-primary" style="flex: 1;">💾 ${financeFormFlow === 'income' ? 'Geliri' : 'Gideri'} Kaydet</button>
+                    <button type="button" id="financeCancelEditBtn" class="btn-secondary" style="display: none;" onclick="resetFinanceForm()">İptal</button>
+                </div>
+            </form>
+
+            <h4 class="milk-history-title" style="margin-top: 1.4rem;">Kasa Hareketleri (${periodLabel})</h4>
+            ${txListHtml}
+        </div>
+    `;
+}
+
+window.setFinancePeriod = function (monthStr) {
+    financeSelectedMonth = monthStr || '';
+    renderFinanceView();
+};
+
+window.setFinanceFormFlow = function (flow) {
+    financeFormFlow = flow === 'income' ? 'income' : 'expense';
+    renderFinanceView();
+};
+
+window.applyFinancePreset = function (flow, category, title) {
+    if (financeFormFlow !== flow) {
+        financeFormFlow = flow;
+        renderFinanceView();
+    }
+    const catEl = document.getElementById('financeCategory');
+    const titleEl = document.getElementById('financeTitle');
+    const amountEl = document.getElementById('financeAmount');
+    if (catEl) catEl.value = category;
+    if (titleEl) titleEl.value = title;
+    if (amountEl) amountEl.focus();
+};
+
+window.saveMilkUnitPrice = function (event) {
+    event.preventDefault();
+    const rawVal = document.getElementById('milkUnitPriceInput')?.value.trim() || '';
+    const price = rawVal === '' ? 0 : Number(rawVal);
+    if (!Number.isFinite(price) || price < 0) {
+        Swal.fire({ title: 'Hata', text: 'Geçerli bir litre fiyatı girin.', icon: 'error', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const tx = db.transaction("ayarlar", "readwrite");
+    tx.objectStore("ayarlar").put({ key: 'milkUnitPrice', value: price });
+    tx.oncomplete = () => {
+        farmSettings.milkUnitPrice = price;
+        renderFinanceView();
+        Swal.fire({
+            title: 'Güncellendi!',
+            text: `Süt birim fiyatı ${formatTRY(price)}/L olarak kaydedildi.`,
+            icon: 'success',
+            timer: 1400,
+            showConfirmButton: false
+        });
+    };
+};
+
+window.resetFinanceForm = function () {
+    const form = document.getElementById('financeEntryForm');
+    if (form) form.reset();
+    const editIdEl = document.getElementById('financeEditId');
+    const dateEl = document.getElementById('financeDate');
+    const submitBtn = document.getElementById('financeSubmitBtn');
+    const cancelBtn = document.getElementById('financeCancelEditBtn');
+    if (editIdEl) editIdEl.value = '';
+    if (dateEl) dateEl.value = getTodayDateString();
+    if (submitBtn) submitBtn.innerText = `💾 ${financeFormFlow === 'income' ? 'Geliri' : 'Gideri'} Kaydet`;
+    if (cancelBtn) cancelBtn.style.display = 'none';
+};
+
+window.saveFinanceTransaction = function (event) {
+    event.preventDefault();
+    const editId = document.getElementById('financeEditId')?.value || '';
+    const category = document.getElementById('financeCategory')?.value || '';
+    const date = document.getElementById('financeDate')?.value || '';
+    const title = document.getElementById('financeTitle')?.value.trim() || '';
+    const rawAmount = document.getElementById('financeAmount')?.value.trim() || '';
+    const notes = document.getElementById('financeNotes')?.value.trim() || '';
+    const amount = Number(rawAmount);
+
+    if (!date || !title || !Number.isFinite(amount) || amount <= 0) {
+        Swal.fire({ title: 'Uyarı', text: 'Lütfen tarih, açıklama ve geçerli bir tutar girin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const record = {
+        date,
+        flow: financeFormFlow,
+        category,
+        title,
+        amount,
+        notes
+    };
+    if (editId) record.id = Number(editId);
+
+    const tx = db.transaction("finans", "readwrite");
+    const store = tx.objectStore("finans");
+    if (editId) store.put(record);
+    else store.add(record);
+
+    tx.oncomplete = () => {
+        loadData();
+        Swal.fire({
+            title: editId ? 'Güncellendi!' : 'Kaydedildi!',
+            text: `${title} (${formatTRY(amount)}) kaydedildi.`,
+            icon: 'success',
+            timer: 1400,
+            showConfirmButton: false
+        });
+    };
+};
+
+window.editFinanceTransaction = function (txId) {
+    const item = financeData.find(f => f.id === Number(txId));
+    if (!item) return;
+
+    if (financeFormFlow !== item.flow) {
+        financeFormFlow = item.flow === 'income' ? 'income' : 'expense';
+        renderFinanceView();
+    }
+
+    document.getElementById('financeEditId').value = item.id;
+    document.getElementById('financeCategory').value = item.category;
+    document.getElementById('financeDate').value = item.date || getTodayDateString();
+    document.getElementById('financeTitle').value = item.title || '';
+    document.getElementById('financeAmount').value = item.amount;
+    document.getElementById('financeNotes').value = item.notes || '';
+    document.getElementById('financeSubmitBtn').innerText = '💾 Kaydı Güncelle';
+    document.getElementById('financeCancelEditBtn').style.display = 'inline-block';
+
+    const formEl = document.getElementById('financeEntryForm');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+window.deleteFinanceTransaction = function (txId) {
+    const item = financeData.find(f => f.id === Number(txId));
+    if (!item) return;
+
+    Swal.fire({
+        title: 'Kasa kaydını sil?',
+        text: `${formatDateTR(item.date)} — ${item.title} (${formatTRY(item.amount)}) silinecek.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Evet, Sil',
+        cancelButtonText: 'İptal'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const tx = db.transaction("finans", "readwrite");
+        tx.objectStore("finans").delete(item.id);
+        tx.oncomplete = () => loadData();
+    });
+};
+
+window.exportFinanceCSV = function () {
+    const period = financeSelectedMonth || '';
+    const summary = computeFinanceSummary(period);
+    const headers = ['Tarih', 'Tip', 'Kategori', 'Açıklama', 'Tutar (TL)', 'Notlar'];
+    const rows = [];
+
+    if (summary.estimatedMilkIncome > 0) {
+        rows.push([
+            period || getTodayDateString(),
+            'Gelir (Otomatik)',
+            'Tahmini Süt Geliri',
+            `${formatLiters(summary.totalMilkLiters)} L × ${formatLiters(summary.milkUnitPrice)} TL`,
+            formatLiters(summary.estimatedMilkIncome),
+            ''
+        ]);
+    }
+
+    allData.forEach(animal => {
+        if (animal.herdStatus === 'sold' && matchesFinancePeriod(animal.exitDate, period)) {
+            rows.push([
+                formatDateTR(animal.exitDate),
+                'Gelir (Otomatik)',
+                'Hayvan Satışı',
+                `Küpe: ${animal.kupeNo}${animal.hayvanLakabi ? ` (${animal.hayvanLakabi})` : ''}`,
+                formatLiters(animal.salePrice || 0),
+                ''
+            ]);
+        }
+        getHealthRecords(animal).forEach(rec => {
+            if (!matchesFinancePeriod(rec.date, period) || !(Number(rec.cost) > 0)) return;
+            rows.push([
+                formatDateTR(rec.date),
+                'Gider (Otomatik)',
+                'Hayvan Sağlık & Aşı',
+                `Küpe: ${animal.kupeNo} — ${rec.title}`,
+                `-${formatLiters(rec.cost)}`,
+                rec.notes || ''
+            ]);
+        });
+    });
+
+    summary.periodTransactions.forEach(tx => {
+        const cleanCat = getFinanceCategoryLabel(tx.flow, tx.category).replace(/^[^\wÇĞİÖŞÜçğıöşü]+/, '').trim();
+        rows.push([
+            formatDateTR(tx.date),
+            tx.flow === 'income' ? 'Gelir' : 'Gider',
+            cleanCat,
+            tx.title || '',
+            tx.flow === 'income' ? formatLiters(tx.amount) : `-${formatLiters(tx.amount)}`,
+            tx.notes || ''
+        ]);
+    });
+
+    if (!rows.length) {
+        Swal.fire({ title: 'Kayıt Bulunamadı', text: 'Seçili dönemde dışa aktarılacak finans kaydı yok.', icon: 'info', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const suffix = period || `Tumu_${getTodayDateString()}`;
+    downloadCsvFile(`Ciftlik_Gelir_Gider_${suffix}.csv`, headers, rows);
+    Swal.fire({ title: 'İndirildi!', text: `${rows.length} finans satırı CSV (Excel) olarak indirildi.`, icon: 'success', timer: 1600, showConfirmButton: false });
+};
+
 function renderHomeReproductionAlerts() {
     const container = document.getElementById('homeReproductionAlerts');
     if (!container) return;
@@ -3383,15 +3928,25 @@ window.closeModal = function () {
 window.exportJSON = function () {
     showLoading("Yedek alınıyor, lütfen bekleyiniz...");
     setTimeout(() => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
-        const today = new Date().toISOString().split('T')[0];
-        const todayTime = new Date().toISOString().split('T')[1].split('.')[0];
+        const backupPayload = {
+            version: 2,
+            exportedAt: new Date().toISOString(),
+            animals: allData,
+            finance: financeData,
+            settings: farmSettings
+        };
+        const blob = new Blob([JSON.stringify(backupPayload)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const today = getTodayDateString();
+        const now = new Date();
+        const todayTime = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
         const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("href", url);
         downloadAnchorNode.setAttribute("download", `Ciftlik_Yedek_${today}_${todayTime}.json`);
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
 
         hideLoading();
         Swal.fire({ title: 'Yedek Alındı!', text: 'Yedek başarıyla alındı ve cihazınıza indirildi.', icon: 'success', confirmButtonText: 'Kapat' });
@@ -3411,11 +3966,34 @@ window.importJSON = function (event) {
             const reader = new FileReader();
             reader.onload = function (e) {
                 try {
-                    const data = JSON.parse(e.target.result);
-                    const tx = db.transaction("kayitlar", "readwrite");
-                    const store = tx.objectStore("kayitlar");
-                    store.clear();
-                    data.forEach(item => store.put(item));
+                    const parsed = JSON.parse(e.target.result);
+                    const isV2 = parsed && !Array.isArray(parsed) && Array.isArray(parsed.animals);
+                    const animalsList = isV2 ? parsed.animals : (Array.isArray(parsed) ? parsed : null);
+                    if (!animalsList) throw new Error('Geçersiz biçim');
+
+                    const financeList = isV2 && Array.isArray(parsed.finance) ? parsed.finance : [];
+                    const settingsObj = isV2 && parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : {};
+
+                    const storeNames = ["kayitlar"];
+                    if (db.objectStoreNames.contains("finans")) storeNames.push("finans");
+                    if (db.objectStoreNames.contains("ayarlar")) storeNames.push("ayarlar");
+
+                    const tx = db.transaction(storeNames, "readwrite");
+                    const animalStore = tx.objectStore("kayitlar");
+                    animalStore.clear();
+                    animalsList.forEach(item => animalStore.put(item));
+
+                    if (storeNames.includes("finans")) {
+                        const finStore = tx.objectStore("finans");
+                        finStore.clear();
+                        financeList.forEach(item => finStore.put(item));
+                    }
+                    if (storeNames.includes("ayarlar")) {
+                        const setStore = tx.objectStore("ayarlar");
+                        setStore.clear();
+                        Object.entries(settingsObj).forEach(([key, value]) => setStore.put({ key, value }));
+                    }
+
                     tx.oncomplete = () => {
                         hideLoading();
                         Swal.fire({ title: 'Tamamlandı!', text: 'Yedek başarıyla yüklendi.', icon: 'success', confirmButtonText: 'Kapat' });

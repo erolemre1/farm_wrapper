@@ -68,6 +68,11 @@
                     <h3>Toplu Aşı & Sağlık</h3>
                     <p>Seçili hayvanlara tek seferde uygula</p>
                 </div>
+                <div class="dash-card" onclick="switchView('financeView')">
+                    <div class="dash-icon">💰</div>
+                    <h3>Gelir & Gider</h3>
+                    <p>Süt geliri, yem/gider ve aylık kâr-zarar</p>
+                </div>
                 <div class="dash-card" onclick="switchView('syncView')">
                     <div class="dash-icon">🔄</div>
                     <h3>Aktarım & Yedek</h3>
@@ -268,6 +273,14 @@
                 <button type="button" class="btn-secondary detail-back-btn" onclick="switchView('listView')">← Hayvan Listesine Dön</button>
             </div>
             <div id="bulkHealthContainer"></div>
+        </div>
+
+        <!-- 3.9. BÖLÜM: ÇİFTLİK GELİR-GİDER (KASA) -->
+        <div id="financeView" class="view-section">
+            <div class="detail-top-bar">
+                <button type="button" class="btn-secondary detail-back-btn" onclick="switchView('homeView')">← Ana Sayfaya Dön</button>
+            </div>
+            <div id="financeContainer"></div>
         </div>
 
         <!-- 4. BÖLÜM: AKTARIM VE YEDEKLEME -->
