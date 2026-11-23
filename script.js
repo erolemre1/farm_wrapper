@@ -941,3 +941,16 @@ window.installApp = async function() {
 window.addEventListener('load', () => {
     checkIOSInstall();
 });
+
+// İki parmakla yakınlaştırmayı (pinch-to-zoom) engelle
+document.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
+    document.addEventListener(eventName, (e) => {
+        e.preventDefault();
+    }, { passive: false });
+});
