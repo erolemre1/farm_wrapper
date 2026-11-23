@@ -330,7 +330,7 @@
 
         @media (min-width: 600px) {
             .dashboard-grid {
-                grid-template-columns: 1fr 1fr 1fr;
+                grid-template-columns: 1fr 1fr;
             }
         }
 
@@ -385,11 +385,12 @@
             background: none;
             color: #6c757d;
             border: none;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 5px 10px;
+            flex: 1;
+            padding: 5px 4px;
             cursor: pointer;
             margin: 0;
             font-weight: normal;
@@ -1034,4 +1035,401 @@
     background: #f8f9fa;
     border-radius: 8px;
     border: 1px dashed #ccc;
+}
+
+/* --- ANA SAYFA SÜT ÖZETİ --- */
+.home-milk-summary {
+    margin: 0 0.5rem 1.25rem 0.5rem;
+}
+
+.home-milk-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    border-left: 5px solid #0d6efd;
+}
+
+.home-milk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+
+.home-milk-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #0056b3;
+}
+
+.home-milk-date {
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 600;
+}
+
+.home-milk-btn {
+    margin: 0;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.82rem;
+    background: #0d6efd;
+    color: white;
+    border-radius: 6px;
+}
+
+.home-milk-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+@media (max-width: 500px) {
+    .home-milk-metrics {
+        grid-template-columns: 1fr;
+    }
+}
+
+.home-milk-metric {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+}
+
+.home-milk-metric-label {
+    display: block;
+    font-size: 0.76rem;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+.home-milk-metric-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #222;
+}
+
+.home-milk-metric-sub {
+    display: block;
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 2px;
+}
+
+/* --- TOPLU GÜNLÜK SÜT GİRİŞİ VE GRAFİKLER --- */
+.bulk-date-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    margin-top: 1rem;
+    justify-content: center;
+}
+
+.bulk-date-bar input[type="date"] {
+    flex: 1 1 150px;
+    min-width: 140px;
+}
+
+.bulk-date-bar button {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.82rem;
+    background: #e9ecef;
+    color: #333;
+}
+
+.bulk-date-bar button.btn-today {
+    background: #0d6efd;
+    color: white;
+}
+
+.bulk-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+    .bulk-summary-strip {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.bulk-summary-box {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    text-align: center;
+}
+
+.bulk-summary-box.total-highlight {
+    background: #f0f9f4;
+    border-color: #c3e6cb;
+}
+
+.bulk-summary-label {
+    display: block;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.bulk-summary-val {
+    display: block;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #222;
+    margin-top: 2px;
+}
+
+.bulk-summary-box.total-highlight .bulk-summary-val {
+    color: #155724;
+}
+
+.bulk-milk-search {
+    margin-bottom: 0.85rem;
+}
+
+.bulk-milk-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 1rem;
+}
+
+.bulk-milk-row {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 0.8rem;
+}
+
+.bulk-milk-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.6rem;
+}
+
+.bulk-cow-link {
+    font-weight: 700;
+    color: #0056b3;
+    cursor: pointer;
+    font-size: 0.98rem;
+}
+
+.bulk-cow-link:hover {
+    text-decoration: underline;
+}
+
+.bulk-cow-nick {
+    font-weight: normal;
+    color: #666;
+    font-size: 0.86rem;
+}
+
+.bulk-row-total {
+    background: #e7f5ff;
+    color: #0c5460;
+    font-weight: 700;
+    font-size: 0.82rem;
+    padding: 3px 9px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.bulk-milk-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.bulk-milk-inputs label {
+    font-size: 0.78rem;
+    color: #555;
+    margin-bottom: 3px;
+}
+
+/* --- SÜT GRAFİĞİ --- */
+.chart-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+
+.chart-header-bar h3 {
+    margin: 0;
+    color: #0056b3;
+    font-size: 1.15rem;
+}
+
+.chart-range-tabs {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.chart-range-btn {
+    margin: 0;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    background: #e9ecef;
+    color: #333;
+    border-radius: 6px;
+}
+
+.chart-range-btn.active {
+    background: #0056b3;
+    color: white;
+}
+
+.milk-chart-legend {
+    display: flex;
+    gap: 14px;
+    font-size: 0.8rem;
+    color: #555;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.legend-morning {
+    background: #f59e0b;
+}
+
+.legend-evening {
+    background: #0d6efd;
+}
+
+.milk-chart-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.milk-chart-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    min-width: 280px;
+}
+
+.milk-chart-bar-group {
+    cursor: pointer;
+}
+
+.milk-chart-bar-group:hover rect.bar-hit {
+    fill: rgba(13, 110, 253, 0.08);
+}
+
+.milk-chart-tooltip {
+    margin-top: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    background: #f8fbff;
+    border: 1px solid #d0e3ff;
+    border-radius: 6px;
+    font-size: 0.84rem;
+    color: #1f3b5c;
+    text-align: center;
+}
+
+/* --- EN VERİMLİ İNEKLER --- */
+.top-cows-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 0.75rem;
+}
+
+.top-cow-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 0.7rem 0.85rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.top-cow-item:hover {
+    background: #eef5ff;
+}
+
+.top-cow-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.top-cow-rank {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #0056b3;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.top-cow-rank.rank-1 {
+    background: #f59e0b;
+}
+
+.top-cow-rank.rank-2 {
+    background: #6c757d;
+}
+
+.top-cow-rank.rank-3 {
+    background: #cd7f32;
+}
+
+.top-cow-name {
+    font-weight: 700;
+    color: #222;
+    font-size: 0.92rem;
+}
+
+.top-cow-sub {
+    font-size: 0.78rem;
+    color: #666;
+}
+
+.top-cow-right {
+    text-align: right;
+}
+
+.top-cow-avg {
+    font-weight: 700;
+    color: #198754;
+    font-size: 0.95rem;
+}
+
+.top-cow-total {
+    font-size: 0.76rem;
+    color: #666;
 }

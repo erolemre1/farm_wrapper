@@ -5,6 +5,7 @@ const viewRoutes = {
     addView: 'add-animal',
     listView: 'animals',
     detailView: 'animal-detail',
+    milkView: 'milk',
     syncView: 'sync'
 };
 
@@ -21,6 +22,8 @@ let filteredData = [];
 let currentView = null;
 let selectedAnimalId = null;
 let editReturnView = 'listView';
+let bulkMilkDate = null;
+let milkChartRange = 7;
 let isDataLoaded = false;
 let isDataLoading = false;
 let isListDirty = true;
@@ -121,8 +124,12 @@ function switchView(viewId, updateHistory = true, animalId = null) {
     // 4. Sayfayı en üste kaydır
     window.scrollTo(0, 0);
 
-    // 5. Liste veya detay ekranı açıldığında verileri/kartları yükle
-    if (viewId === 'listView') {
+    // 5. İlgili ekran açıldığında verileri/kartları yükle
+    if (viewId === 'homeView') {
+        if (isDataLoaded) {
+            renderHomeMilkSummary();
+        }
+    } else if (viewId === 'listView') {
         if (!isDataLoaded) {
             const container = document.getElementById('cardContainer');
             if (container && !container.innerHTML) {
@@ -147,6 +154,18 @@ function switchView(viewId, updateHistory = true, animalId = null) {
             }
         } else {
             renderAnimalDetail(selectedAnimalId);
+        }
+    } else if (viewId === 'milkView') {
+        if (!isDataLoaded) {
+            const milkContainer = document.getElementById('milkDashboardContainer');
+            if (milkContainer) {
+                milkContainer.innerHTML = `<div class="card" style="text-align: center; color: #666; font-style: italic;">Süt verileri yükleniyor...</div>`;
+            }
+            if (db && !isDataLoading) {
+                loadData();
+            }
+        } else {
+            renderMilkView();
         }
     }
 }
@@ -347,6 +366,28 @@ function formatDateTR(dateStr) {
     return dateStr;
 }
 
+function formatShortDateTR(dateStr) {
+    if (!dateStr) return '';
+    const parts = String(dateStr).split('-');
+    if (parts.length === 3) return `${parts[2]}.${parts[1]}`;
+    return dateStr;
+}
+
+function addDaysToDateStr(dateStr, deltaDays) {
+    const parts = String(dateStr || getTodayDateString()).split('-').map(Number);
+    const dt = new Date(parts[0], (parts[1] || 1) - 1, (parts[2] || 1) + deltaDays);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+function getRecentDateRange(days) {
+    const today = getTodayDateString();
+    const dates = [];
+    for (let i = days - 1; i >= 0; i--) {
+        dates.push(addDaysToDateStr(today, -i));
+    }
+    return dates;
+}
+
 function formatLiters(value) {
     const num = Number(value) || 0;
     return num.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -354,6 +395,10 @@ function formatLiters(value) {
 
 function isAnimalMilking(row) {
     return Boolean(row && row.cinsiyet === 'Dişi' && row.isMilking);
+}
+
+function getActiveMilkingAnimals() {
+    return allData.filter(row => (!row.herdStatus || row.herdStatus === 'active') && isAnimalMilking(row));
 }
 
 function getMilkRecords(row) {
@@ -375,10 +420,13 @@ function loadData() {
         allDataById = new Map(allData.map(row => [row.id, row]));
         const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
         document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
+        renderHomeMilkSummary();
         if (currentView === 'listView') {
             applyFilter();
         } else if (currentView === 'detailView') {
             renderAnimalDetail(selectedAnimalId);
+        } else if (currentView === 'milkView') {
+            renderMilkView();
         }
     };
     req.onerror = () => {
@@ -669,6 +717,23 @@ function renderAnimalDetail(id) {
                     </div>
                 </div>
 
+                ${records.length > 0 ? (() => {
+                    const chartSeries = records.slice(0, 14).reverse().map(r => {
+                        const m = Number(r.morning) || 0;
+                        const e = Number(r.evening) || 0;
+                        return { date: r.date, morning: m, evening: e, total: m + e, cowCount: 1 };
+                    });
+                    return `
+                        <h4 class="milk-history-title">Süt Verimi Grafiği (Son ${chartSeries.length} Kayıt)</h4>
+                        <div class="milk-chart-legend">
+                            <span><i class="legend-dot legend-morning"></i>Sabah Sütü</span>
+                            <span><i class="legend-dot legend-evening"></i>Akşam Sütü</span>
+                        </div>
+                        <div class="milk-chart-wrapper">${buildMilkBarChartSvg(chartSeries, 'detailMilkChartTooltip', false)}</div>
+                        <div id="detailMilkChartTooltip" class="milk-chart-tooltip">Günlük sabah/akşam detayını görmek için grafikteki çubuklara dokunun.</div>
+                    `;
+                })() : ''}
+
                 <h4 class="milk-history-title">Süt Geçmişi</h4>
                 ${historyHtml}
             </div>
@@ -747,9 +812,499 @@ function updateAnimalRecordInDB(updatedAnimal, onSuccess) {
         }
         allDataById.set(updatedAnimal.id, updatedAnimal);
         isListDirty = true;
+        renderHomeMilkSummary();
         if (onSuccess) onSuccess();
     };
 }
+
+function aggregateHerdMilkSeries(days) {
+    const dates = getRecentDateRange(days);
+    const mapByDate = new Map(dates.map(date => [date, { date, morning: 0, evening: 0, total: 0, cowCount: 0 }]));
+    const cowTotals = new Map();
+
+    allData.forEach(animal => {
+        if (animal.cinsiyet !== 'Dişi' || !Array.isArray(animal.milkRecords)) return;
+        const isActive = !animal.herdStatus || animal.herdStatus === 'active';
+
+        animal.milkRecords.forEach(rec => {
+            const bucket = mapByDate.get(rec.date);
+            if (!bucket) return;
+            const m = Number(rec.morning) || 0;
+            const e = Number(rec.evening) || 0;
+            const tot = m + e;
+            bucket.morning += m;
+            bucket.evening += e;
+            bucket.total += tot;
+            if (tot > 0 || rec.morning !== undefined || rec.evening !== undefined) {
+                bucket.cowCount += 1;
+            }
+
+            if (isActive && tot > 0) {
+                const entry = cowTotals.get(animal.id) || { animal, total: 0, days: 0 };
+                entry.total += tot;
+                entry.days += 1;
+                cowTotals.set(animal.id, entry);
+            }
+        });
+    });
+
+    const series = dates.map(d => mapByDate.get(d));
+    const topCows = Array.from(cowTotals.values())
+        .map(item => ({ ...item, avg: item.days ? item.total / item.days : 0 }))
+        .sort((a, b) => b.avg - a.avg || b.total - a.total)
+        .slice(0, 8);
+
+    return { series, topCows };
+}
+
+function buildMilkBarChartSvg(series, tooltipId, showCowCount = true) {
+    const width = 600;
+    const height = 210;
+    const padLeft = 40;
+    const padRight = 14;
+    const padTop = 24;
+    const padBottom = 34;
+    const plotW = width - padLeft - padRight;
+    const plotH = height - padTop - padBottom;
+
+    const rawMax = Math.max(...series.map(d => d.total), 0);
+    const maxVal = rawMax > 0 ? Math.ceil((rawMax * 1.15) / 5) * 5 : 10;
+    const midVal = maxVal / 2;
+
+    const n = series.length || 1;
+    const slotW = plotW / n;
+    const barW = Math.max(6, Math.min(34, slotW * 0.62));
+    const labelStep = n <= 10 ? 1 : (n <= 16 ? 2 : 5);
+
+    const yFor = (val) => padTop + plotH - (val / maxVal) * plotH;
+
+    const gridLines = [0, midVal, maxVal].map(val => {
+        const y = yFor(val);
+        return `
+            <line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#e9ecef" stroke-dasharray="3,3" />
+            <text x="${padLeft - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="#666">${formatLiters(val)}</text>
+        `;
+    }).join('');
+
+    const bars = series.map((item, idx) => {
+        const xCenter = padLeft + slotW * idx + slotW / 2;
+        const xBar = xCenter - barW / 2;
+        const morningH = (item.morning / maxVal) * plotH;
+        const eveningH = (item.evening / maxVal) * plotH;
+        const totalH = morningH + eveningH;
+        const yMorning = padTop + plotH - morningH;
+        const yEvening = padTop + plotH - totalH;
+        const showXLabel = idx % labelStep === 0 || idx === n - 1;
+        const showTopValue = n <= 14 && item.total > 0;
+        const cowArg = showCowCount ? item.cowCount : -1;
+
+        return `
+            <g class="milk-chart-bar-group" onclick="showMilkChartPoint('${tooltipId}', '${item.date}', ${item.morning}, ${item.evening}, ${cowArg})">
+                <rect class="bar-hit" x="${padLeft + slotW * idx}" y="${padTop}" width="${slotW}" height="${plotH}" fill="transparent" />
+                ${morningH > 0 ? `<rect x="${xBar}" y="${yMorning}" width="${barW}" height="${morningH}" rx="2" fill="#f59e0b" />` : ''}
+                ${eveningH > 0 ? `<rect x="${xBar}" y="${yEvening}" width="${barW}" height="${eveningH}" rx="2" fill="#0d6efd" />` : ''}
+                ${showTopValue ? `<text x="${xCenter}" y="${Math.max(12, yEvening - 5)}" text-anchor="middle" font-size="10" font-weight="700" fill="#333">${formatLiters(item.total)}</text>` : ''}
+                ${showXLabel ? `<text x="${xCenter}" y="${height - 10}" text-anchor="middle" font-size="10.5" fill="#666">${formatShortDateTR(item.date)}</text>` : ''}
+            </g>
+        `;
+    }).join('');
+
+    return `
+        <svg class="milk-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Günlük süt verimi grafiği">
+            ${gridLines}
+            <line x1="${padLeft}" y1="${padTop + plotH}" x2="${width - padRight}" y2="${padTop + plotH}" stroke="#ced4da" />
+            ${bars}
+        </svg>
+    `;
+}
+
+window.showMilkChartPoint = function (tooltipId, dateStr, morning, evening, cowCount) {
+    const el = document.getElementById(tooltipId);
+    if (!el) return;
+    const total = (Number(morning) || 0) + (Number(evening) || 0);
+    const cowPart = cowCount >= 0 ? ` · ${cowCount} inek` : '';
+    el.innerHTML = `<strong>📅 ${formatDateTR(dateStr)}</strong> — 🌅 Sabah: <strong>${formatLiters(morning)} L</strong> · 🌇 Akşam: <strong>${formatLiters(evening)} L</strong> · Toplam: <strong>${formatLiters(total)} L</strong>${cowPart}`;
+};
+
+function renderHomeMilkSummary() {
+    const container = document.getElementById('homeMilkSummary');
+    if (!container) return;
+
+    const today = getTodayDateString();
+    const activeMilking = getActiveMilkingAnimals();
+    const { series } = aggregateHerdMilkSeries(7);
+    const todayStats = series[series.length - 1] || { morning: 0, evening: 0, total: 0, cowCount: 0 };
+
+    const recordedDays = series.filter(d => d.total > 0);
+    const avg7 = recordedDays.length
+        ? recordedDays.reduce((sum, d) => sum + d.total, 0) / recordedDays.length
+        : 0;
+
+    let enteredMilkingToday = 0;
+    activeMilking.forEach(animal => {
+        if (getMilkRecords(animal).some(r => r.date === today && ((Number(r.morning) || 0) + (Number(r.evening) || 0) > 0))) {
+            enteredMilkingToday += 1;
+        }
+    });
+
+    container.innerHTML = `
+        <div class="home-milk-card">
+            <div class="home-milk-header">
+                <div>
+                    <h3>🥛 Bugünkü Süt Özeti</h3>
+                    <span class="home-milk-date">${formatDateTR(today)}</span>
+                </div>
+                <button type="button" class="home-milk-btn" onclick="switchView('milkView')">Toplu Süt Gir →</button>
+            </div>
+            <div class="home-milk-metrics">
+                <div class="home-milk-metric">
+                    <span class="home-milk-metric-label">Bugün Sürü Toplamı</span>
+                    <span class="home-milk-metric-value">${formatLiters(todayStats.total)} L</span>
+                    <span class="home-milk-metric-sub">Sabah ${formatLiters(todayStats.morning)} L · Akşam ${formatLiters(todayStats.evening)} L</span>
+                </div>
+                <div class="home-milk-metric">
+                    <span class="home-milk-metric-label">Sağılır İnek</span>
+                    <span class="home-milk-metric-value">${enteredMilkingToday} / ${activeMilking.length}</span>
+                    <span class="home-milk-metric-sub">Bugün süt girilen</span>
+                </div>
+                <div class="home-milk-metric">
+                    <span class="home-milk-metric-label">Son 7 Gün Ort.</span>
+                    <span class="home-milk-metric-value">${recordedDays.length ? `${formatLiters(avg7)} L` : '-'}</span>
+                    <span class="home-milk-metric-sub">${recordedDays.length ? `${recordedDays.length} kayıtlı gün` : 'Henüz kayıt yok'}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderMilkAnalyticsSection() {
+    const container = document.getElementById('milkAnalyticsSection');
+    if (!container) return;
+
+    const { series, topCows } = aggregateHerdMilkSeries(milkChartRange);
+    const periodTotal = series.reduce((sum, d) => sum + d.total, 0);
+    const recordedDays = series.filter(d => d.total > 0);
+    const dailyAvg = recordedDays.length ? periodTotal / recordedDays.length : 0;
+    const peakDay = recordedDays.reduce((best, cur) => (!best || cur.total > best.total ? cur : best), null);
+
+    const topCowsHtml = topCows.length === 0
+        ? '<div class="milk-empty-state">Seçili dönemde henüz süt kaydı bulunmuyor.</div>'
+        : `<div class="top-cows-list">${topCows.map((item, idx) => {
+            const rankClass = idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''));
+            return `
+                <div class="top-cow-item" onclick="openAnimalDetail(${item.animal.id})">
+                    <div class="top-cow-left">
+                        <span class="top-cow-rank ${rankClass}">${idx + 1}</span>
+                        <div>
+                            <div class="top-cow-name">Küpe: ${escapeHtml(item.animal.kupeNo)}${item.animal.hayvanLakabi ? ` (${escapeHtml(item.animal.hayvanLakabi)})` : ''}</div>
+                            <div class="top-cow-sub">${escapeHtml(item.animal.hayvanCinsi || '')} · ${item.days} gün kayıt</div>
+                        </div>
+                    </div>
+                    <div class="top-cow-right">
+                        <div class="top-cow-avg">${formatLiters(item.avg)} L/gün</div>
+                        <div class="top-cow-total">Toplam: ${formatLiters(item.total)} L</div>
+                    </div>
+                </div>
+            `;
+        }).join('')}</div>`;
+
+    container.innerHTML = `
+        <div class="card">
+            <div class="chart-header-bar">
+                <h3>📊 Sürü Süt Verimi Grafiği</h3>
+                <div class="chart-range-tabs">
+                    <button type="button" class="chart-range-btn ${milkChartRange === 7 ? 'active' : ''}" onclick="setMilkChartRange(7)">Son 7 Gün</button>
+                    <button type="button" class="chart-range-btn ${milkChartRange === 30 ? 'active' : ''}" onclick="setMilkChartRange(30)">Son 30 Gün</button>
+                </div>
+            </div>
+
+            <div class="milk-stats-grid" style="margin-top: 0;">
+                <div class="milk-stat-card">
+                    <span class="milk-stat-label">${milkChartRange} Gün Toplam</span>
+                    <span class="milk-stat-value">${formatLiters(periodTotal)} L</span>
+                </div>
+                <div class="milk-stat-card">
+                    <span class="milk-stat-label">Günlük Ort. (${recordedDays.length} gün)</span>
+                    <span class="milk-stat-value">${recordedDays.length ? `${formatLiters(dailyAvg)} L` : '-'}</span>
+                </div>
+                <div class="milk-stat-card">
+                    <span class="milk-stat-label">En Yüksek Gün</span>
+                    <span class="milk-stat-value">${peakDay ? `${formatLiters(peakDay.total)} L` : '-'}</span>
+                    ${peakDay ? `<span class="home-milk-metric-sub">${formatDateTR(peakDay.date)}</span>` : ''}
+                </div>
+            </div>
+
+            <div class="milk-chart-legend">
+                <span><i class="legend-dot legend-morning"></i>Sabah Sütü</span>
+                <span><i class="legend-dot legend-evening"></i>Akşam Sütü</span>
+            </div>
+            <div class="milk-chart-wrapper">${buildMilkBarChartSvg(series, 'herdMilkChartTooltip', true)}</div>
+            <div id="herdMilkChartTooltip" class="milk-chart-tooltip">Günlük sabah/akşam detayını görmek için grafikteki çubuklara dokunun.</div>
+
+            <h4 class="milk-history-title" style="margin-top: 1.4rem;">🏆 En Verimli İnekler (Son ${milkChartRange} Gün)</h4>
+            ${topCowsHtml}
+        </div>
+    `;
+}
+
+function renderMilkView() {
+    const container = document.getElementById('milkDashboardContainer');
+    if (!container) return;
+
+    if (!bulkMilkDate) {
+        bulkMilkDate = getTodayDateString();
+    }
+
+    const activeMilking = getActiveMilkingAnimals();
+    let totalMorning = 0;
+    let totalEvening = 0;
+    let filledCount = 0;
+
+    const rowsHtml = activeMilking.map(animal => {
+        const rec = getMilkRecords(animal).find(r => r.date === bulkMilkDate) || null;
+        const morningVal = rec && rec.morning !== undefined && rec.morning !== null ? rec.morning : '';
+        const eveningVal = rec && rec.evening !== undefined && rec.evening !== null ? rec.evening : '';
+        const mNum = Number(morningVal) || 0;
+        const eNum = Number(eveningVal) || 0;
+        const rowTotal = mNum + eNum;
+
+        totalMorning += mNum;
+        totalEvening += eNum;
+        if (morningVal !== '' || eveningVal !== '') {
+            filledCount += 1;
+        }
+
+        const searchKey = `${animal.kupeNo || ''} ${animal.hayvanLakabi || ''}`.toLowerCase();
+        return `
+            <div class="bulk-milk-row" data-search="${escapeHtml(searchKey)}">
+                <div class="bulk-milk-row-header">
+                    <span class="bulk-cow-link" onclick="openAnimalDetail(${animal.id})">
+                        Küpe: ${escapeHtml(animal.kupeNo)}
+                        ${animal.hayvanLakabi ? `<span class="bulk-cow-nick">(${escapeHtml(animal.hayvanLakabi)})</span>` : ''}
+                    </span>
+                    <span class="bulk-row-total" id="bulkRowTotal-${animal.id}">Toplam: ${formatLiters(rowTotal)} L</span>
+                </div>
+                <div class="bulk-milk-inputs">
+                    <div>
+                        <label for="bulkMorning-${animal.id}">🌅 Sabah (L)</label>
+                        <input type="number" id="bulkMorning-${animal.id}" class="bulk-milk-input" data-animal-id="${animal.id}" data-part="morning" min="0" step="0.1" inputmode="decimal" placeholder="0" value="${morningVal}" oninput="onBulkMilkInput(${animal.id})">
+                    </div>
+                    <div>
+                        <label for="bulkEvening-${animal.id}">🌇 Akşam (L)</label>
+                        <input type="number" id="bulkEvening-${animal.id}" class="bulk-milk-input" data-animal-id="${animal.id}" data-part="evening" min="0" step="0.1" inputmode="decimal" placeholder="0" value="${eveningVal}" oninput="onBulkMilkInput(${animal.id})">
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const bulkEntryContent = activeMilking.length === 0
+        ? `
+            <div class="milk-empty-state">
+                Şu an sürüde <strong>Sağılır Hayvan</strong> olarak işaretlenmiş inek bulunmuyor.<br>
+                Dişi hayvanları eklerken/düzenlerken veya detay sayfasından <strong>Sağılır Hayvan</strong> olarak işaretlediğinizde burada toplu süt girişi yapabilirsiniz.
+                <div style="margin-top: 12px;">
+                    <button type="button" class="btn-primary" style="max-width: 240px;" onclick="switchView('listView')">Hayvan Listesine Git</button>
+                </div>
+            </div>
+        `
+        : `
+            <div class="bulk-summary-strip">
+                <div class="bulk-summary-box">
+                    <span class="bulk-summary-label">🌅 Sabah Toplamı</span>
+                    <span class="bulk-summary-val" id="bulkMorningTotal">${formatLiters(totalMorning)} L</span>
+                </div>
+                <div class="bulk-summary-box">
+                    <span class="bulk-summary-label">🌇 Akşam Toplamı</span>
+                    <span class="bulk-summary-val" id="bulkEveningTotal">${formatLiters(totalEvening)} L</span>
+                </div>
+                <div class="bulk-summary-box total-highlight">
+                    <span class="bulk-summary-label">🥛 Sürü Toplamı</span>
+                    <span class="bulk-summary-val" id="bulkGrandTotal">${formatLiters(totalMorning + totalEvening)} L</span>
+                </div>
+                <div class="bulk-summary-box">
+                    <span class="bulk-summary-label">Girilen İnek</span>
+                    <span class="bulk-summary-val" id="bulkFilledCount">${filledCount} / ${activeMilking.length}</span>
+                </div>
+            </div>
+
+            <div class="bulk-milk-search">
+                <input type="text" id="bulkMilkSearchInput" placeholder="🔍 Sağılır ineklerde küpe veya lakap ara..." oninput="filterBulkMilkRows(this.value)">
+            </div>
+
+            <div class="bulk-milk-list" id="bulkMilkList">
+                ${rowsHtml}
+            </div>
+
+            <button type="button" class="btn-primary" onclick="saveBulkMilkRecords()">💾 ${formatDateTR(bulkMilkDate)} Süt Kayıtlarını Kaydet</button>
+        `;
+
+    container.innerHTML = `
+        <div class="card">
+            <h2 style="margin-top: 0; color: #0056b3;">🥛 Toplu Günlük Süt Girişi</h2>
+                <input type="date" id="bulkMilkDate" value="${bulkMilkDate}" onchange="setBulkMilkDate(this.value)">
+
+            <div class="bulk-date-bar">
+                <button type="button" onclick="shiftBulkMilkDate(-1)">‹ Önceki</button>
+                <button type="button" class="btn-today" onclick="setBulkMilkDate(getTodayDateString())">Bugün</button>
+                <button type="button" onclick="shiftBulkMilkDate(1)">Sonraki ›</button>
+            </div>
+            ${bulkEntryContent}
+        </div>
+        <div id="milkAnalyticsSection"></div>
+    `;
+
+    renderMilkAnalyticsSection();
+}
+
+window.setBulkMilkDate = function (dateStr) {
+    if (!dateStr) return;
+    bulkMilkDate = dateStr;
+    renderMilkView();
+};
+
+window.shiftBulkMilkDate = function (deltaDays) {
+    bulkMilkDate = addDaysToDateStr(bulkMilkDate || getTodayDateString(), deltaDays);
+    renderMilkView();
+};
+
+window.filterBulkMilkRows = function (query) {
+    const q = String(query || '').toLowerCase().trim();
+    document.querySelectorAll('#bulkMilkList .bulk-milk-row').forEach(rowEl => {
+        const key = rowEl.dataset.search || '';
+        rowEl.style.display = !q || key.includes(q) ? 'block' : 'none';
+    });
+};
+
+window.onBulkMilkInput = function (animalId) {
+    const mEl = document.getElementById(`bulkMorning-${animalId}`);
+    const eEl = document.getElementById(`bulkEvening-${animalId}`);
+    const rowTotalEl = document.getElementById(`bulkRowTotal-${animalId}`);
+    if (mEl && eEl && rowTotalEl) {
+        const m = Number(mEl.value) || 0;
+        const e = Number(eEl.value) || 0;
+        rowTotalEl.innerText = `Toplam: ${formatLiters(m + e)} L`;
+    }
+
+    let sumMorning = 0;
+    let sumEvening = 0;
+    let filled = 0;
+    const rows = document.querySelectorAll('#bulkMilkList .bulk-milk-row');
+    rows.forEach(rowEl => {
+        const morningInput = rowEl.querySelector('input[data-part="morning"]');
+        const eveningInput = rowEl.querySelector('input[data-part="evening"]');
+        const mRaw = morningInput?.value.trim() ?? '';
+        const eRaw = eveningInput?.value.trim() ?? '';
+        if (mRaw !== '' || eRaw !== '') filled += 1;
+        sumMorning += Number(mRaw) || 0;
+        sumEvening += Number(eRaw) || 0;
+    });
+
+    const mTotalEl = document.getElementById('bulkMorningTotal');
+    const eTotalEl = document.getElementById('bulkEveningTotal');
+    const gTotalEl = document.getElementById('bulkGrandTotal');
+    const filledEl = document.getElementById('bulkFilledCount');
+    if (mTotalEl) mTotalEl.innerText = `${formatLiters(sumMorning)} L`;
+    if (eTotalEl) eTotalEl.innerText = `${formatLiters(sumEvening)} L`;
+    if (gTotalEl) gTotalEl.innerText = `${formatLiters(sumMorning + sumEvening)} L`;
+    if (filledEl) filledEl.innerText = `${filled} / ${rows.length}`;
+};
+
+window.saveBulkMilkRecords = function () {
+    const dateStr = bulkMilkDate || document.getElementById('bulkMilkDate')?.value;
+    if (!dateStr) return;
+
+    const activeMilking = getActiveMilkingAnimals();
+    const updates = [];
+    let grandTotal = 0;
+
+    for (const animal of activeMilking) {
+        const mEl = document.getElementById(`bulkMorning-${animal.id}`);
+        const eEl = document.getElementById(`bulkEvening-${animal.id}`);
+        if (!mEl || !eEl) continue;
+
+        const mRaw = mEl.value.trim();
+        const eRaw = eEl.value.trim();
+        const existingRecords = getMilkRecords(animal);
+        const existingForDate = existingRecords.find(r => r.date === dateStr);
+
+        if (mRaw === '' && eRaw === '') {
+            if (existingForDate) {
+                updates.push({
+                    ...animal,
+                    milkRecords: existingRecords.filter(r => r.date !== dateStr)
+                });
+            }
+            continue;
+        }
+
+        const morning = mRaw === '' ? 0 : Number(mRaw);
+        const evening = eRaw === '' ? 0 : Number(eRaw);
+        if (!Number.isFinite(morning) || morning < 0 || !Number.isFinite(evening) || evening < 0) {
+            Swal.fire({
+                title: 'Hata',
+                text: `Küpe ${animal.kupeNo} için geçerli bir süt miktarı girin.`,
+                icon: 'error',
+                confirmButtonText: 'Tamam'
+            });
+            return;
+        }
+
+        grandTotal += morning + evening;
+
+        const unchanged = existingForDate &&
+            Number(existingForDate.morning) === morning &&
+            Number(existingForDate.evening) === evening;
+
+        if (!unchanged) {
+            const nextRecords = existingRecords.filter(r => r.date !== dateStr);
+            nextRecords.push({ date: dateStr, morning, evening });
+            nextRecords.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+            updates.push({
+                ...animal,
+                milkRecords: nextRecords
+            });
+        }
+    }
+
+    if (updates.length === 0) {
+        Swal.fire({
+            title: 'Bilgi',
+            text: 'Kaydedilecek yeni bir değişiklik bulunmuyor.',
+            icon: 'info',
+            timer: 1500,
+            showConfirmButton: false
+        });
+        return;
+    }
+
+    const tx = db.transaction("kayitlar", "readwrite");
+    const store = tx.objectStore("kayitlar");
+    updates.forEach(updatedAnimal => store.put(updatedAnimal));
+
+    tx.oncomplete = () => {
+        updates.forEach(updatedAnimal => {
+            const idx = allData.findIndex(r => r.id === updatedAnimal.id);
+            if (idx !== -1) allData[idx] = updatedAnimal;
+            allDataById.set(updatedAnimal.id, updatedAnimal);
+        });
+        isListDirty = true;
+        renderHomeMilkSummary();
+        renderMilkAnalyticsSection();
+        Swal.fire({
+            title: 'Kaydedildi!',
+            text: `${formatDateTR(dateStr)} için ${updates.length} hayvan güncellendi. Günlük toplam: ${formatLiters(grandTotal)} L`,
+            icon: 'success',
+            timer: 1800,
+            showConfirmButton: false
+        });
+    };
+};
+
+window.setMilkChartRange = function (days) {
+    milkChartRange = days === 30 ? 30 : 7;
+    renderMilkAnalyticsSection();
+};
 
 window.syncMilkFormForDate = function (animalId, dateStr) {
     const animal = allDataById.get(Number(animalId));

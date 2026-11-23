@@ -42,7 +42,8 @@
         
         <!-- 1. BÖLÜM: ANA SAYFA DÜĞMELERİ (DASHBOARD) -->
         <div id="homeView" class="view-section">
-            <h2 style="text-align: center; color: #333; margin-bottom: 20px;">🐄 Çiftlik Yönetim Paneli</h2>
+            <h2 style="text-align: center; color: #333; margin-bottom: 16px;">🐄 Çiftlik Yönetim Paneli</h2>
+            <div id="homeMilkSummary" class="home-milk-summary"></div>
             <div class="dashboard-grid">
                 <div class="dash-card" onclick="switchView('addView')">
                     <div class="dash-icon">➕</div>
@@ -53,6 +54,11 @@
                     <div class="dash-icon">📋</div>
                     <h3>Hayvan Listesi</h3>
                     <p>Kayıtları incele, ara ve düzenle</p>
+                </div>
+                <div class="dash-card" onclick="switchView('milkView')">
+                    <div class="dash-icon">🥛</div>
+                    <h3>Süt & Sağım</h3>
+                    <p>Toplu günlük süt girişi ve grafikler</p>
                 </div>
                 <div class="dash-card" onclick="switchView('syncView')">
                     <div class="dash-icon">🔄</div>
@@ -219,6 +225,11 @@
             <div id="animalDetailContainer"></div>
         </div>
 
+        <!-- 3.7. BÖLÜM: SÜT & SAĞIM YÖNETİMİ -->
+        <div id="milkView" class="view-section">
+            <div id="milkDashboardContainer"></div>
+        </div>
+
         <!-- 4. BÖLÜM: AKTARIM VE YEDEKLEME -->
         <div id="syncView" class="view-section">
             
@@ -261,6 +272,7 @@
         <button onclick="switchView('homeView')" class="active"><i>🏠</i>Ana Sayfa</button>
         <button onclick="switchView('addView')"><i>➕</i>Ekle</button>
         <button onclick="switchView('listView')"><i>📋</i>Sürü</button>
+        <button onclick="switchView('milkView')"><i>🥛</i>Sağım</button>
         <button onclick="switchView('syncView')"><i>🔄</i>İşlemler</button>
     </nav>
 
