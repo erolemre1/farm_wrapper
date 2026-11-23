@@ -63,6 +63,11 @@
                     <h3>Süt & Sağım</h3>
                     <p>Toplu günlük süt girişi ve grafikler</p>
                 </div>
+                <div class="dash-card" onclick="switchView('bulkHealthView')">
+                    <div class="dash-icon">💉</div>
+                    <h3>Toplu Aşı & Sağlık</h3>
+                    <p>Seçili hayvanlara tek seferde uygula</p>
+                </div>
                 <div class="dash-card" onclick="switchView('syncView')">
                     <div class="dash-icon">🔄</div>
                     <h3>Aktarım & Yedek</h3>
@@ -178,6 +183,18 @@
             <option value="milk-desc">Süt Verimi (En Yüksek)</option>
             <option value="weight-desc">Canlı Ağırlık (En Ağır)</option>
         </select>
+        <div class="list-toolbar-actions">
+            <!-- <button type="button" class="btn-success list-bulk-health-btn" onclick="switchView('bulkHealthView')">💉 Toplu Aşı/İşlem</button> -->
+            <select id="sortOrder" class="sort-select" onchange="applyFilter()" aria-label="Sıralama">
+                <option value="id-asc">Sıralama: Kayıt Sırası</option>
+                <option value="kupe-asc">Küpe No (Artan)</option>
+                <option value="kupe-desc">Küpe No (Azalan)</option>
+                <option value="age-young">Yaş: En Genç → En Yaşlı</option>
+                <option value="age-old">Yaş: En Yaşlı → En Genç</option>
+                <option value="milk-desc">Süt Verimi (En Yüksek)</option>
+                <option value="weight-desc">Canlı Ağırlık (En Ağır)</option>
+            </select>
+        </div>
     </div>
     
 <div class="search-filter-container">
@@ -243,6 +260,14 @@
         <!-- 3.7. BÖLÜM: SÜT & SAĞIM YÖNETİMİ -->
         <div id="milkView" class="view-section">
             <div id="milkDashboardContainer"></div>
+        </div>
+
+        <!-- 3.8. BÖLÜM: TOPLU AŞI & SAĞLIK İŞLEMİ -->
+        <div id="bulkHealthView" class="view-section">
+            <div class="detail-top-bar">
+                <button type="button" class="btn-secondary detail-back-btn" onclick="switchView('listView')">← Hayvan Listesine Dön</button>
+            </div>
+            <div id="bulkHealthContainer"></div>
         </div>
 
         <!-- 4. BÖLÜM: AKTARIM VE YEDEKLEME -->

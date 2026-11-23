@@ -2243,3 +2243,128 @@ input.input-error {
     border-color: #dc3545;
     background-color: #fff5f5;
 }
+
+/* --- TOPLU AŞI & SAĞLIK İŞLEMİ --- */
+.list-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.list-bulk-health-btn {
+    margin: 0;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.84rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 550px) {
+    .list-toolbar-actions {
+        width: 100%;
+    }
+
+    .list-bulk-health-btn {
+        width: 100%;
+    }
+}
+
+.bulk-select-toolbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+
+.bulk-select-chip {
+    margin: 0;
+    padding: 0.38rem 0.72rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+}
+
+.bulk-select-chip:hover {
+    background: #e2e8f0;
+}
+
+.bulk-select-chip.clear-chip {
+    background: #fff5f5;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.bulk-selection-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.bulk-selection-count {
+    background: #198754;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.bulk-animal-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 380px;
+    overflow-y: auto;
+    padding-right: 4px;
+    margin-bottom: 1rem;
+}
+
+.bulk-animal-check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.65rem 0.8rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-weight: normal;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.bulk-animal-check-item:hover {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.bulk-animal-check-item input[type="checkbox"] {
+    width: 19px;
+    height: 19px;
+    margin: 0;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.bulk-animal-check-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bulk-animal-check-title {
+    font-weight: 700;
+    color: #222;
+    font-size: 0.92rem;
+}
+
+.bulk-animal-check-meta {
+    font-size: 0.78rem;
+    color: #666;
+}

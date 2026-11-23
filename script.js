@@ -6,6 +6,7 @@ const viewRoutes = {
     listView: 'animals',
     detailView: 'animal-detail',
     milkView: 'milk',
+    bulkHealthView: 'bulk-health',
     syncView: 'sync'
 };
 
@@ -118,7 +119,7 @@ function switchView(viewId, updateHistory = true, animalId = null) {
 
     // 3. Alt menüdeki (Bottom Nav) butonların renklerini güncelle
     document.querySelectorAll('.bottom-nav button').forEach(btn => btn.classList.remove('active'));
-    const navViewId = viewId === 'detailView' ? 'listView' : viewId;
+    const navViewId = (viewId === 'detailView' || viewId === 'bulkHealthView') ? 'listView' : viewId;
     const activeBtn = document.querySelector(`.bottom-nav button[onclick="switchView('${navViewId}')"]`);
     if(activeBtn) activeBtn.classList.add('active');
 
@@ -175,6 +176,18 @@ function switchView(viewId, updateHistory = true, animalId = null) {
             }
         } else {
             renderMilkView();
+        }
+    } else if (viewId === 'bulkHealthView') {
+        if (!isDataLoaded) {
+            const bulkHealthContainer = document.getElementById('bulkHealthContainer');
+            if (bulkHealthContainer) {
+                bulkHealthContainer.innerHTML = `<div class="card" style="text-align: center; color: #666; font-style: italic;">Sürü verileri yükleniyor...</div>`;
+            }
+            if (db && !isDataLoading) {
+                loadData();
+            }
+        } else {
+            renderBulkHealthView();
         }
     }
 }
@@ -712,6 +725,8 @@ function loadData() {
             renderAnimalDetail(selectedAnimalId);
         } else if (currentView === 'milkView') {
             renderMilkView();
+        } else if (currentView === 'bulkHealthView') {
+            renderBulkHealthView();
         }
     };
     req.onerror = () => {
@@ -1877,6 +1892,268 @@ window.deleteHealthRecord = function (animalId, recordId) {
         updateAnimalRecordInDB(updatedAnimal, () => {
             renderAnimalDetail(updatedAnimal.id);
         });
+    });
+};
+
+function renderBulkHealthView() {
+    const container = document.getElementById('bulkHealthContainer');
+    if (!container) return;
+
+    const activeAnimals = allData.filter(row => !row.herdStatus || row.herdStatus === 'active');
+    const today = getTodayDateString();
+
+    if (activeAnimals.length === 0) {
+        container.innerHTML = `
+            <div class="card" style="text-align: center; padding: 2rem;">
+                <h2 style="margin-top: 0; color: #198754;">💉 Toplu Aşı & Sağlık İşlemi</h2>
+                <p style="color: #666;">Sürüde aktif hayvan kaydı bulunmuyor.</p>
+                <button type="button" class="btn-primary" style="max-width: 240px;" onclick="switchView('addView')">Yeni Hayvan Ekle</button>
+            </div>
+        `;
+        return;
+    }
+
+    const checklistHtml = activeAnimals.map(animal => {
+        const ageLabel = calculateAgeInfo(animal.dogumTarihi)?.label || '-';
+        const ageGroup = getAnimalAgeGroup(animal);
+        const tagsStr = getAnimalTags(animal).join(' ');
+        const searchKey = `${animal.kupeNo || ''} ${animal.hayvanLakabi || ''} ${animal.hayvanCinsi || ''} ${tagsStr}`.toLowerCase();
+        const genderIcon = animal.cinsiyet === 'Erkek' ? '♂️' : (animal.cinsiyet === 'Dişi' ? '♀️' : '');
+        const milkingFlag = isAnimalMilking(animal) ? '1' : '0';
+
+        return `
+            <label class="bulk-animal-check-item" data-search="${escapeHtml(searchKey)}" data-gender="${escapeHtml(animal.cinsiyet || '')}" data-age-group="${ageGroup}" data-milking="${milkingFlag}">
+                <input type="checkbox" class="bulk-health-checkbox" value="${animal.id}" onchange="updateBulkHealthSelectedCount()">
+                <div class="bulk-animal-check-info">
+                    <span class="bulk-animal-check-title">${genderIcon} Küpe: ${escapeHtml(animal.kupeNo)}${animal.hayvanLakabi ? ` (${escapeHtml(animal.hayvanLakabi)})` : ''}</span>
+                    <span class="bulk-animal-check-meta">${escapeHtml(animal.hayvanCinsi || '-')} · Yaş: ${escapeHtml(ageLabel)}${milkingFlag === '1' ? ' · 🥛 Sağılır' : ''}</span>
+                </div>
+            </label>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="card">
+            <h2 style="margin-top: 0; color: #198754;">💉 Toplu Aşı & Sağlık İşlemi</h2>
+            <p style="font-size: 0.86rem; color: #666; margin-top: 0; margin-bottom: 1rem;">
+                Aynı gün yapılan aşı, parazit ilacı veya veteriner işlemini seçtiğiniz tüm hayvanlara tek seferde kaydedin.
+            </p>
+
+            <div class="health-presets">
+                <button type="button" class="health-preset-chip" onclick="applyBulkHealthPreset('vaccine', 'Şap Aşısı')">💉 Şap Aşısı</button>
+                <button type="button" class="health-preset-chip" onclick="applyBulkHealthPreset('vaccine', 'Brucella Aşısı')">💉 Brucella</button>
+                <button type="button" class="health-preset-chip" onclick="applyBulkHealthPreset('parasite', 'İç-Dış Parazit İlacı')">🐛 Parazit</button>
+                <button type="button" class="health-preset-chip" onclick="applyBulkHealthPreset('treatment', 'Vitamin / Mineral Takviyesi')">💊 Vitamin</button>
+                <button type="button" class="health-preset-chip" onclick="applyBulkHealthPreset('treatment', 'Ayak / Tırnak Bakımı')">🦶 Ayak Bakımı</button>
+                <button type="button" class="health-preset-chip" onclick="applyBulkHealthPreset('vet', 'Sürü Veteriner Muayenesi')">🩺 Muayene</button>
+            </div>
+
+            <form id="bulkHealthForm" onsubmit="saveBulkHealthRecords(event)">
+                <div class="health-form-grid">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="bulkHealthType">İşlem Türü</label>
+                        <select id="bulkHealthType" required>
+                            <option value="vaccine">💉 Aşı</option>
+                            <option value="parasite">🐛 Parazit İlacı</option>
+                            <option value="treatment">💊 Tedavi / İlaç</option>
+                            <option value="vet">🩺 Veteriner Muayenesi</option>
+                            <option value="other">📝 Diğer</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="bulkHealthDate">İşlem Tarihi</label>
+                        <input type="date" id="bulkHealthDate" value="${today}" required>
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="bulkHealthTitle">İşlem / Aşı Adı</label>
+                        <input type="text" id="bulkHealthTitle" placeholder="Örn. Şap Aşısı, Bahar Parazit İlacı" required>
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="bulkHealthMedicine">İlaç / Aşı Markası (İsteğe Bağlı)</label>
+                        <input type="text" id="bulkHealthMedicine" placeholder="Örn. İvermektin, Şap Aşısı">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="bulkHealthCost">Maliyet (TL - İsteğe Bağlı)</label>
+                        <input type="number" id="bulkHealthCost" min="0" step="0.01" inputmode="decimal" placeholder="Örn. 5000">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="bulkHealthCostMode">Maliyet Dağıtımı</label>
+                        <select id="bulkHealthCostMode">
+                            <option value="split-total">Toplam Tutarı Seçililere Böl</option>
+                            <option value="per-animal">Hayvan Başı Maliyet Olarak Yaz</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="bulkHealthNextDate">Sıradaki Aşı / Kontrol Tarihi (Hatırlatma İçin)</label>
+                        <input type="date" id="bulkHealthNextDate">
+                    </div>
+                    <div class="form-group full-span" style="margin-bottom: 0;">
+                        <label for="bulkHealthNotes">Veteriner Notu / Açıklama</label>
+                        <input type="text" id="bulkHealthNotes" placeholder="Kısa açıklama veya doz bilgisi...">
+                    </div>
+                </div>
+
+                <div class="bulk-selection-header" style="margin-top: 1.2rem;">
+                    <h3 style="margin: 0; font-size: 1.05rem; color: #333;">Uygulanacak Hayvanlar</h3>
+                    <span class="bulk-selection-count" id="bulkHealthSelectedCount">Seçili: 0 / ${activeAnimals.length}</span>
+                </div>
+
+                <div class="bulk-select-toolbar">
+                    <button type="button" class="bulk-select-chip" onclick="selectBulkHealthAnimals('all')">✅ Tüm Sürü</button>
+                    <button type="button" class="bulk-select-chip" onclick="selectBulkHealthAnimals('female')">♀️ Dişiler</button>
+                    <button type="button" class="bulk-select-chip" onclick="selectBulkHealthAnimals('male')">♂️ Erkekler</button>
+                    <button type="button" class="bulk-select-chip" onclick="selectBulkHealthAnimals('calf')">🐮 Buzağılar</button>
+                    <button type="button" class="bulk-select-chip" onclick="selectBulkHealthAnimals('milking')">🥛 Sağılırlar</button>
+                    <button type="button" class="bulk-select-chip clear-chip" onclick="selectBulkHealthAnimals('none')">❌ Temizle</button>
+                </div>
+
+                <div class="bulk-milk-search">
+                    <input type="text" id="bulkHealthSearchInput" placeholder="🔍 Hayvanlarda küpe, lakap, ırk veya etiket ara..." oninput="filterBulkHealthChecklist(this.value)">
+                </div>
+
+                <div class="bulk-animal-checklist" id="bulkHealthChecklist">
+                    ${checklistHtml}
+                </div>
+
+                <button type="submit" class="btn-success" style="width: 100%; padding: 0.75rem; font-size: 0.96rem;">💉 Seçili Hayvanlara Toplu Kaydet</button>
+            </form>
+        </div>
+    `;
+}
+
+window.applyBulkHealthPreset = function (type, title) {
+    const typeEl = document.getElementById('bulkHealthType');
+    const titleEl = document.getElementById('bulkHealthTitle');
+    if (typeEl) typeEl.value = type;
+    if (titleEl) {
+        titleEl.value = title;
+        titleEl.focus();
+    }
+};
+
+window.filterBulkHealthChecklist = function (query) {
+    const q = String(query || '').toLowerCase().trim();
+    document.querySelectorAll('#bulkHealthChecklist .bulk-animal-check-item').forEach(item => {
+        const key = item.dataset.search || '';
+        item.style.display = !q || key.includes(q) ? 'flex' : 'none';
+    });
+};
+
+window.updateBulkHealthSelectedCount = function () {
+    const checkboxes = document.querySelectorAll('#bulkHealthChecklist .bulk-health-checkbox');
+    let checked = 0;
+    checkboxes.forEach(cb => { if (cb.checked) checked += 1; });
+    const countEl = document.getElementById('bulkHealthSelectedCount');
+    if (countEl) countEl.innerText = `Seçili: ${checked} / ${checkboxes.length}`;
+};
+
+window.selectBulkHealthAnimals = function (mode) {
+    document.querySelectorAll('#bulkHealthChecklist .bulk-animal-check-item').forEach(item => {
+        const cb = item.querySelector('.bulk-health-checkbox');
+        if (!cb) return;
+        if (mode === 'all') cb.checked = true;
+        else if (mode === 'none') cb.checked = false;
+        else if (mode === 'female') cb.checked = item.dataset.gender === 'Dişi';
+        else if (mode === 'male') cb.checked = item.dataset.gender === 'Erkek';
+        else if (mode === 'calf') cb.checked = item.dataset.ageGroup === 'calf';
+        else if (mode === 'milking') cb.checked = item.dataset.milking === '1';
+    });
+    updateBulkHealthSelectedCount();
+};
+
+window.saveBulkHealthRecords = function (event) {
+    event.preventDefault();
+    const type = document.getElementById('bulkHealthType')?.value || 'vaccine';
+    const date = document.getElementById('bulkHealthDate')?.value || '';
+    const title = document.getElementById('bulkHealthTitle')?.value.trim() || '';
+    const medicine = document.getElementById('bulkHealthMedicine')?.value.trim() || '';
+    const rawCost = document.getElementById('bulkHealthCost')?.value.trim() || '';
+    const costMode = document.getElementById('bulkHealthCostMode')?.value || 'split-total';
+    const nextDate = document.getElementById('bulkHealthNextDate')?.value || '';
+    const notes = document.getElementById('bulkHealthNotes')?.value.trim() || '';
+
+    if (!date || !title) {
+        Swal.fire({ title: 'Uyarı', text: 'Lütfen tarih ve işlem/aşı adını girin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const totalCostInput = rawCost === '' ? 0 : Number(rawCost);
+    if (!Number.isFinite(totalCostInput) || totalCostInput < 0) {
+        Swal.fire({ title: 'Hata', text: 'Geçerli bir maliyet tutarı girin.', icon: 'error', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const selectedIds = Array.from(document.querySelectorAll('#bulkHealthChecklist .bulk-health-checkbox:checked'))
+        .map(cb => Number(cb.value))
+        .filter(Number.isFinite);
+
+    if (selectedIds.length === 0) {
+        Swal.fire({ title: 'Hayvan Seçilmedi', text: 'Lütfen en az bir hayvan seçin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const perAnimalCost = totalCostInput > 0
+        ? (costMode === 'split-total' ? Math.round((totalCostInput / selectedIds.length) * 100) / 100 : totalCostInput)
+        : 0;
+
+    const costSummary = perAnimalCost > 0
+        ? ` (Hayvan başı ~${formatLiters(perAnimalCost)} TL)`
+        : '';
+
+    Swal.fire({
+        title: 'Toplu Kayıt Onayı',
+        text: `${selectedIds.length} hayvana "${title}" kaydı eklenecek${costSummary}. Onaylıyor musunuz?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Evet, Kaydet',
+        cancelButtonText: 'İptal'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        const updates = [];
+        const baseTs = Date.now();
+        selectedIds.forEach((animalId, idx) => {
+            const animal = allDataById.get(animalId);
+            if (!animal) return;
+            const newRec = {
+                id: `${baseTs}-${idx}-${Math.random().toString(36).slice(2, 5)}`,
+                date,
+                type,
+                title,
+                medicine,
+                cost: perAnimalCost,
+                nextDate,
+                notes
+            };
+            const nextRecords = [...getHealthRecords(animal), newRec]
+                .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            updates.push({ ...animal, healthRecords: nextRecords });
+        });
+
+        const tx = db.transaction("kayitlar", "readwrite");
+        const store = tx.objectStore("kayitlar");
+        updates.forEach(u => store.put(u));
+
+        tx.oncomplete = () => {
+            updates.forEach(u => {
+                const i = allData.findIndex(r => r.id === u.id);
+                if (i !== -1) allData[i] = u;
+                allDataById.set(u.id, u);
+            });
+            isListDirty = true;
+            renderHomeHerdStats();
+            renderHomeHealthAlerts();
+            renderBulkHealthView();
+            Swal.fire({
+                title: 'Tamamlandı!',
+                text: `${updates.length} hayvana "${title}" kaydı başarıyla işlendi.`,
+                icon: 'success',
+                confirmButtonText: 'Tamam',
+                confirmButtonColor: '#28a745'
+            });
+        };
     });
 };
 
