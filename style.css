@@ -1433,3 +1433,274 @@
     font-size: 0.76rem;
     color: #666;
 }
+
+/* --- ÜREME, DOĞUM TAKİBİ VE SOY AĞACI --- */
+.card-badge-calving {
+    background: #d63384;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.76rem;
+    font-weight: bold;
+}
+
+.home-repro-alerts {
+    margin: 0 0.5rem 1.25rem 0.5rem;
+}
+
+.home-repro-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    border-left: 5px solid #d63384;
+}
+
+.home-repro-section + .home-repro-section {
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px dashed #e9ecef;
+}
+
+.home-repro-title {
+    margin: 0 0 0.65rem 0;
+    font-size: 1rem;
+    color: #a61e4d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.home-repro-title.dryoff-title {
+    color: #b45309;
+}
+
+.repro-alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.repro-alert-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 0.65rem 0.85rem;
+    background: #fff5f8;
+    border: 1px solid #f8d7e6;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.repro-alert-item:hover {
+    background: #ffe6f0;
+}
+
+.repro-alert-item.dryoff-item {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.repro-alert-item.dryoff-item:hover {
+    background: #fef3c7;
+}
+
+.repro-alert-name {
+    font-weight: 700;
+    color: #222;
+    font-size: 0.92rem;
+}
+
+.repro-alert-date {
+    font-size: 0.78rem;
+    color: #666;
+    margin-top: 2px;
+}
+
+.repro-pill {
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.repro-pill-urgent {
+    background: #dc3545;
+    color: white;
+}
+
+.repro-pill-soon {
+    background: #d63384;
+    color: white;
+}
+
+.repro-pill-dryoff {
+    background: #f59e0b;
+    color: #1f2937;
+}
+
+.repro-pill-normal {
+    background: #e7f5ff;
+    color: #0c5460;
+}
+
+.repro-form-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.repro-form-row .form-group {
+    flex: 1 1 180px;
+    margin-bottom: 0;
+}
+
+.repro-form-row button {
+    margin: 0;
+    padding: 0.6rem 0.95rem;
+    font-size: 0.86rem;
+}
+
+.repro-progress-wrap {
+    margin-bottom: 1rem;
+}
+
+.repro-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: #444;
+    margin-bottom: 6px;
+}
+
+.repro-progress-track {
+    width: 100%;
+    height: 10px;
+    background: #e9ecef;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.repro-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #20c997, #0d6efd);
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+
+.repro-progress-fill.near-due {
+    background: linear-gradient(90deg, #f59e0b, #d63384);
+}
+
+.repro-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 0.75rem 0.9rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+}
+
+.repro-banner-dryoff {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+
+.repro-banner-info {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #555;
+}
+
+.repro-banner button {
+    margin: 0;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.82rem;
+}
+
+.pedigree-block + .pedigree-block {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.pedigree-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.65rem;
+}
+
+.pedigree-block-header h4 {
+    margin: 0;
+    font-size: 0.98rem;
+    color: #333;
+}
+
+.pedigree-add-calf-btn {
+    margin: 0;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    background: #28a745;
+    color: white;
+}
+
+.pedigree-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pedigree-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 0.7rem 0.85rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    transition: background-color 0.15s;
+}
+
+.pedigree-item.clickable {
+    cursor: pointer;
+}
+
+.pedigree-item.clickable:hover {
+    background: #eef5ff;
+    border-color: #cfe2ff;
+}
+
+.pedigree-item-name {
+    font-weight: 700;
+    color: #0056b3;
+    font-size: 0.92rem;
+}
+
+.pedigree-item-sub {
+    font-size: 0.78rem;
+    color: #666;
+    margin-top: 2px;
+}
+
+.pedigree-arrow {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0d6efd;
+    white-space: nowrap;
+}

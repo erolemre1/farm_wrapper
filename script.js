@@ -128,6 +128,7 @@ function switchView(viewId, updateHistory = true, animalId = null) {
     if (viewId === 'homeView') {
         if (isDataLoaded) {
             renderHomeMilkSummary();
+            renderHomeReproductionAlerts();
         }
     } else if (viewId === 'listView') {
         if (!isDataLoaded) {
@@ -401,6 +402,76 @@ function getActiveMilkingAnimals() {
     return allData.filter(row => (!row.herdStatus || row.herdStatus === 'active') && isAnimalMilking(row));
 }
 
+const GESTATION_DAYS = 283;
+const DRY_OFF_BEFORE_CALVING_DAYS = 60;
+
+function diffDaysBetweenDateStr(fromDateStr, toDateStr) {
+    if (!fromDateStr || !toDateStr) return null;
+    const f = String(fromDateStr).split('-').map(Number);
+    const t = String(toDateStr).split('-').map(Number);
+    if (f.length !== 3 || t.length !== 3) return null;
+    const fromUtc = Date.UTC(f[0], f[1] - 1, f[2]);
+    const toUtc = Date.UTC(t[0], t[1] - 1, t[2]);
+    return Math.round((toUtc - fromUtc) / 86400000);
+}
+
+function normalizeKupeNo(val) {
+    return String(val ?? '').trim();
+}
+
+function getPregnancyInfo(animal) {
+    if (!animal || animal.cinsiyet !== 'Dişi' || !animal.kogustuguTarih) return null;
+    const breedingDate = animal.kogustuguTarih;
+    const estimatedCalvingDate = addDaysToDateStr(breedingDate, GESTATION_DAYS);
+    const dryOffDate = addDaysToDateStr(estimatedCalvingDate, -DRY_OFF_BEFORE_CALVING_DAYS);
+    const today = getTodayDateString();
+    const daysSinceBreeding = diffDaysBetweenDateStr(breedingDate, today);
+    const daysUntilCalving = diffDaysBetweenDateStr(today, estimatedCalvingDate);
+    const daysUntilDryOff = diffDaysBetweenDateStr(today, dryOffDate);
+
+    if (daysSinceBreeding === null || daysUntilCalving === null || daysUntilDryOff === null) return null;
+
+    const isStale = daysSinceBreeding > 315 || daysSinceBreeding < 0;
+    const isDueSoon = !isStale && daysUntilCalving <= 30 && daysUntilCalving >= -14;
+    const isDryOffDue = !isStale && daysUntilDryOff <= 7 && daysUntilCalving > 0;
+    const isInDryOffPeriod = !isStale && daysUntilDryOff <= 0 && daysUntilCalving > 0;
+    const progressPercent = Math.max(0, Math.min(100, Math.round((daysSinceBreeding / GESTATION_DAYS) * 100)));
+
+    let countdownText = '';
+    if (daysUntilCalving > 0) countdownText = `${daysUntilCalving} gün kaldı`;
+    else if (daysUntilCalving === 0) countdownText = 'Doğum bugün!';
+    else countdownText = `${Math.abs(daysUntilCalving)} gün geçti`;
+
+    return {
+        breedingDate,
+        estimatedCalvingDate,
+        dryOffDate,
+        daysSinceBreeding,
+        daysUntilCalving,
+        daysUntilDryOff,
+        isStale,
+        isDueSoon,
+        isDryOffDue,
+        isInDryOffPeriod,
+        progressPercent,
+        countdownText
+    };
+}
+
+function findMotherAnimal(animal) {
+    const motherKupe = normalizeKupeNo(animal?.anneKupeNo);
+    if (!motherKupe) return null;
+    return allData.find(row => row.id !== animal.id && normalizeKupeNo(row.kupeNo) === motherKupe) || null;
+}
+
+function findOffspringAnimals(animal) {
+    const ownKupe = normalizeKupeNo(animal?.kupeNo);
+    if (!ownKupe) return [];
+    return allData
+        .filter(row => row.id !== animal.id && normalizeKupeNo(row.anneKupeNo) === ownKupe)
+        .sort((a, b) => String(b.dogumTarihi || '').localeCompare(String(a.dogumTarihi || '')));
+}
+
 function getMilkRecords(row) {
     if (!row || !Array.isArray(row.milkRecords)) return [];
     return [...row.milkRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -421,6 +492,7 @@ function loadData() {
         const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
         document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
         renderHomeMilkSummary();
+        renderHomeReproductionAlerts();
         if (currentView === 'listView') {
             applyFilter();
         } else if (currentView === 'detailView') {
@@ -510,6 +582,13 @@ function renderTable() {
         const hasLazyImages = Boolean(row.hayvanResmi || row.anneResmi);
         const isActive = !row.herdStatus || row.herdStatus === 'active';
         const milking = isAnimalMilking(row);
+        const pregnancyInfo = isActive ? getPregnancyInfo(row) : null;
+        const calvingBadgeHtml = pregnancyInfo && pregnancyInfo.isDueSoon
+            ? `<span class="card-badge-calving">🤰 ${pregnancyInfo.countdownText}</span>`
+            : '';
+        const calvingRowHtml = pregnancyInfo && !pregnancyInfo.isStale
+            ? `<div class="card-info-row"><strong>Tahmini Doğum:</strong> <span>${formatDateTR(pregnancyInfo.estimatedCalvingDate)} (${pregnancyInfo.countdownText})</span></div>`
+            : '';
         const milkRecords = row.cinsiyet === 'Dişi' ? getMilkRecords(row) : [];
         const latestMilk = milkRecords[0] || null;
         const latestMilkHtml = latestMilk
@@ -530,6 +609,7 @@ function renderTable() {
                 <div class="card-header card-header-clickable" onclick="openAnimalDetail(${row.id})" title="Hayvan detayını görüntüle">
                     <h3>Küpe: ${escapeHtml(row.kupeNo)}</h3>
                     <div class="card-badges">
+                        ${calvingBadgeHtml}
                         ${milking ? '<span class="card-badge-milking">🥛 Sağılır</span>' : ''}
                         <span class="card-badge">#${index + 1}</span>
                     </div>
@@ -540,6 +620,7 @@ function renderTable() {
                     <div class="card-info-row"><strong>Irk:</strong> <span>${escapeHtml(row.hayvanCinsi)}</span></div>
                     <div class="card-info-row"><strong>Doğum Tarihi:</strong> <span>${row.dogumTarihi || '-'}</span></div>
                     <div class="card-info-row"><strong>Koğuştuğu Tarih:</strong> <span>${row.kogustuguTarih || '-'}</span></div>
+                    ${calvingRowHtml}
                     <div class="card-info-row"><strong>Anne Küpe No:</strong> <span>${escapeHtml(row.anneKupeNo || '-')}</span></div>
                     ${latestMilkHtml}
                     ${exitDetailsHtml}
@@ -740,6 +821,133 @@ function renderAnimalDetail(id) {
         `;
     }
 
+    const pregnancyInfo = getPregnancyInfo(animal);
+    let reproductionSectionHtml = '';
+    if (isFemale) {
+        let reproBodyHtml = '';
+        if (!pregnancyInfo) {
+            reproBodyHtml = '<div class="repro-banner repro-banner-info">Koğuşma / tohumlama tarihi girildiğinde tahmini doğum (~283 gün) ve kuruya çekme (~60 gün önce) tarihleri otomatik hesaplanır.</div>';
+        } else if (pregnancyInfo.isStale) {
+            reproBodyHtml = `<div class="repro-banner repro-banner-info">Kayıtlı koğuşma tarihinden (${formatDateTR(pregnancyInfo.breedingDate)}) ${pregnancyInfo.daysSinceBreeding < 0 ? 'ileri bir tarih girilmiş' : `${pregnancyInfo.daysSinceBreeding} gün geçmiş`}. Yeni koğuşma/tohumlama tarihi girebilir veya mevcut tarihi temizleyebilirsiniz.</div>`;
+        } else {
+            const pillClass = pregnancyInfo.daysUntilCalving <= 7
+                ? 'repro-pill-urgent'
+                : (pregnancyInfo.isDueSoon ? 'repro-pill-soon' : (pregnancyInfo.isInDryOffPeriod ? 'repro-pill-dryoff' : 'repro-pill-normal'));
+            const dryOffBannerHtml = pregnancyInfo.isInDryOffPeriod && milking
+                ? `
+                    <div class="repro-banner repro-banner-dryoff">
+                        <span>🛑 <strong>Kuruya çekme dönemi geldi!</strong> (${formatDateTR(pregnancyInfo.dryOffDate)}) Bu inek hâlâ sağılır görünüyor.</span>
+                        <button type="button" class="btn-warning" onclick="toggleAnimalMilking(${animal.id}, false)">Kuruya Çek (Sağımı Kapat)</button>
+                    </div>
+                `
+                : '';
+
+            reproBodyHtml = `
+                ${dryOffBannerHtml}
+                <div class="repro-progress-wrap">
+                    <div class="repro-progress-meta">
+                        <span>Gebelik: <strong>${pregnancyInfo.daysSinceBreeding}. gün</strong> / ${GESTATION_DAYS} gün (%${pregnancyInfo.progressPercent})</span>
+                        <span class="repro-pill ${pillClass}">${pregnancyInfo.countdownText}</span>
+                    </div>
+                    <div class="repro-progress-track">
+                        <div class="repro-progress-fill ${pregnancyInfo.isDueSoon ? 'near-due' : ''}" style="width: ${pregnancyInfo.progressPercent}%"></div>
+                    </div>
+                </div>
+                <div class="detail-info-grid" style="margin-bottom: 1rem;">
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Koğuştuğu / Tohumlama</span>
+                        <span class="detail-info-value">${formatDateTR(pregnancyInfo.breedingDate)}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Kuruya Çekme Tarihi (-60 gün)</span>
+                        <span class="detail-info-value">${formatDateTR(pregnancyInfo.dryOffDate)}</span>
+                    </div>
+                    <div class="detail-info-item">
+                        <span class="detail-info-label">Tahmini Doğum (+283 gün)</span>
+                        <span class="detail-info-value">${formatDateTR(pregnancyInfo.estimatedCalvingDate)}</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-success" style="width: 100%; margin: 0;" onclick="startAddCalfForMother(${animal.id})">🐮 Doğum Yaptı — Buzağı Kaydı Ekle</button>
+            `;
+        }
+
+        reproductionSectionHtml = `
+            <div class="card">
+                <div class="milk-section-header">
+                    <h3>🤰 Üreme & Doğum Takibi</h3>
+                </div>
+                <form class="repro-form-row" onsubmit="saveBreedingDate(event, ${animal.id})">
+                    <div class="form-group">
+                        <label for="detailBreedingDate">Koğuştuğu / Tohumlama Tarihi</label>
+                        <input type="date" id="detailBreedingDate" value="${animal.kogustuguTarih || ''}">
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: auto;">Tarihi Kaydet</button>
+                    ${animal.kogustuguTarih ? `<button type="button" class="btn-secondary" onclick="clearBreedingDate(${animal.id})">Temizle</button>` : ''}
+                </form>
+                ${reproBodyHtml}
+            </div>
+        `;
+    }
+
+    const motherAnimal = findMotherAnimal(animal);
+    const offspringList = findOffspringAnimals(animal);
+    const motherHtml = motherAnimal
+        ? `
+            <div class="pedigree-item clickable" onclick="openAnimalDetail(${motherAnimal.id})">
+                <div>
+                    <div class="pedigree-item-name">🐄 Küpe: ${escapeHtml(motherAnimal.kupeNo)}${motherAnimal.hayvanLakabi ? ` (${escapeHtml(motherAnimal.hayvanLakabi)})` : ''}</div>
+                    <div class="pedigree-item-sub">${escapeHtml(motherAnimal.hayvanCinsi || '-')} · Doğum: ${formatDateTR(motherAnimal.dogumTarihi)}</div>
+                </div>
+                <span class="pedigree-arrow">Profili Gör →</span>
+            </div>
+        `
+        : (animal.anneKupeNo
+            ? `<div class="pedigree-item"><div><div class="pedigree-item-name" style="color: #444;">Küpe: ${escapeHtml(animal.anneKupeNo)}</div><div class="pedigree-item-sub">Sürüde kayıtlı değil${animal.anneCinsi ? ` · Irk: ${escapeHtml(animal.anneCinsi)}` : ''}</div></div></div>`
+            : '<div class="milk-empty-state" style="padding: 0.9rem;">Anne küpe numarası girilmemiş.</div>');
+
+    const showOffspringBlock = isFemale || offspringList.length > 0;
+    const offspringBlockHtml = showOffspringBlock
+        ? `
+            <div class="pedigree-block">
+                <div class="pedigree-block-header">
+                    <h4>🐮 Yavruları (${offspringList.length})</h4>
+                    ${isFemale ? `<button type="button" class="pedigree-add-calf-btn" onclick="startAddCalfForMother(${animal.id})">+ Buzağı Ekle</button>` : ''}
+                </div>
+                ${offspringList.length === 0
+                    ? '<div class="milk-empty-state" style="padding: 0.9rem;">Henüz bu hayvana bağlı kayıtlı yavru bulunmuyor.</div>'
+                    : `<div class="pedigree-list">${offspringList.map(child => {
+                        const childActive = !child.herdStatus || child.herdStatus === 'active';
+                        const genderIcon = child.cinsiyet === 'Erkek' ? '♂️' : (child.cinsiyet === 'Dişi' ? '♀️' : '');
+                        return `
+                            <div class="pedigree-item clickable" onclick="openAnimalDetail(${child.id})">
+                                <div>
+                                    <div class="pedigree-item-name">${genderIcon} Küpe: ${escapeHtml(child.kupeNo)}${child.hayvanLakabi ? ` (${escapeHtml(child.hayvanLakabi)})` : ''}</div>
+                                    <div class="pedigree-item-sub">${escapeHtml(child.cinsiyet || '-')} · ${escapeHtml(child.hayvanCinsi || '-')} · Doğum: ${formatDateTR(child.dogumTarihi)}${!childActive ? ` · ${escapeHtml(exitLabels[child.herdStatus] || 'Sürüden çıktı')}` : ''}</div>
+                                </div>
+                                <span class="pedigree-arrow">Detay →</span>
+                            </div>
+                        `;
+                    }).join('')}</div>`
+                }
+            </div>
+        `
+        : '';
+
+    const pedigreeSectionHtml = `
+        <div class="card">
+            <div class="milk-section-header">
+                <h3>🧬 Soy Ağacı (Anne & Yavrular)</h3>
+            </div>
+            <div class="pedigree-block">
+                <div class="pedigree-block-header">
+                    <h4>Annesi</h4>
+                </div>
+                ${motherHtml}
+            </div>
+            ${offspringBlockHtml}
+        </div>
+    `;
+
     container.innerHTML = `
         <div class="card">
             <div class="detail-header">
@@ -748,6 +956,7 @@ function renderAnimalDetail(id) {
                     ${animal.hayvanLakabi ? `<p class="detail-subtitle">Lakap: ${escapeHtml(animal.hayvanLakabi)}</p>` : ''}
                 </div>
                 <div class="card-badges">
+                    ${pregnancyInfo && pregnancyInfo.isDueSoon ? `<span class="card-badge-calving">🤰 ${pregnancyInfo.countdownText}</span>` : ''}
                     ${milking ? '<span class="card-badge-milking">🥛 Sağılır</span>' : ''}
                     ${statusBadge}
                 </div>
@@ -798,9 +1007,145 @@ function renderAnimalDetail(id) {
                 <button class="btn-danger" onclick="deleteData(${animal.id})">Kalıcı Sil</button>
             </div>
         </div>
+        ${reproductionSectionHtml}
+        ${pedigreeSectionHtml}
         ${milkSectionHtml}
     `;
 }
+
+function renderHomeReproductionAlerts() {
+    const container = document.getElementById('homeReproductionAlerts');
+    if (!container) return;
+
+    const upcomingBirths = [];
+    const dryOffReminders = [];
+
+    allData.forEach(animal => {
+        const isActive = !animal.herdStatus || animal.herdStatus === 'active';
+        if (!isActive || animal.cinsiyet !== 'Dişi') return;
+
+        const info = getPregnancyInfo(animal);
+        if (!info || info.isStale) return;
+
+        if (info.isDueSoon) {
+            upcomingBirths.push({ animal, info });
+        }
+        if (info.isDryOffDue && isAnimalMilking(animal)) {
+            dryOffReminders.push({ animal, info });
+        }
+    });
+
+    if (upcomingBirths.length === 0 && dryOffReminders.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    upcomingBirths.sort((a, b) => a.info.daysUntilCalving - b.info.daysUntilCalving);
+    dryOffReminders.sort((a, b) => a.info.daysUntilDryOff - b.info.daysUntilDryOff);
+
+    const birthsHtml = upcomingBirths.length > 0
+        ? `
+            <div class="home-repro-section">
+                <h3 class="home-repro-title">
+                    <span>🤰 Yaklaşan Doğumlar (30 Gün)</span>
+                    <span class="repro-pill repro-pill-soon">${upcomingBirths.length} inek</span>
+                </h3>
+                <div class="repro-alert-list">
+                    ${upcomingBirths.map(({ animal, info }) => {
+                        const pillClass = info.daysUntilCalving <= 7 ? 'repro-pill-urgent' : 'repro-pill-soon';
+                        return `
+                            <div class="repro-alert-item" onclick="openAnimalDetail(${animal.id})">
+                                <div>
+                                    <div class="repro-alert-name">Küpe: ${escapeHtml(animal.kupeNo)}${animal.hayvanLakabi ? ` (${escapeHtml(animal.hayvanLakabi)})` : ''}</div>
+                                    <div class="repro-alert-date">Tahmini Doğum: ${formatDateTR(info.estimatedCalvingDate)}</div>
+                                </div>
+                                <span class="repro-pill ${pillClass}">${info.countdownText}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `
+        : '';
+
+    const dryOffHtml = dryOffReminders.length > 0
+        ? `
+            <div class="home-repro-section">
+                <h3 class="home-repro-title dryoff-title">
+                    <span>🛑 Kuruya Çekme Hatırlatması</span>
+                    <span class="repro-pill repro-pill-dryoff">${dryOffReminders.length} inek</span>
+                </h3>
+                <div class="repro-alert-list">
+                    ${dryOffReminders.map(({ animal, info }) => {
+                        const dryLabel = info.daysUntilDryOff <= 0
+                            ? 'Kuruya çekilmeli'
+                            : `${info.daysUntilDryOff} gün kaldı`;
+                        return `
+                            <div class="repro-alert-item dryoff-item" onclick="openAnimalDetail(${animal.id})">
+                                <div>
+                                    <div class="repro-alert-name">Küpe: ${escapeHtml(animal.kupeNo)}${animal.hayvanLakabi ? ` (${escapeHtml(animal.hayvanLakabi)})` : ''}</div>
+                                    <div class="repro-alert-date">Kuruya Çekme: ${formatDateTR(info.dryOffDate)} · Doğum: ${formatDateTR(info.estimatedCalvingDate)}</div>
+                                </div>
+                                <span class="repro-pill repro-pill-dryoff">${dryLabel}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `
+        : '';
+
+    container.innerHTML = `<div class="home-repro-card">${birthsHtml}${dryOffHtml}</div>`;
+}
+
+window.saveBreedingDate = function (event, id) {
+    event.preventDefault();
+    const animal = allDataById.get(Number(id));
+    if (!animal || animal.cinsiyet !== 'Dişi') return;
+
+    const dateVal = document.getElementById('detailBreedingDate')?.value || '';
+    const updatedAnimal = { ...animal, kogustuguTarih: dateVal };
+    updateAnimalRecordInDB(updatedAnimal, () => {
+        renderAnimalDetail(updatedAnimal.id);
+        Swal.fire({
+            title: 'Güncellendi!',
+            text: dateVal ? 'Koğuşma / tohumlama tarihi kaydedildi.' : 'Koğuşma tarihi temizlendi.',
+            icon: 'success',
+            timer: 1400,
+            showConfirmButton: false
+        });
+    });
+};
+
+window.clearBreedingDate = function (id) {
+    const animal = allDataById.get(Number(id));
+    if (!animal) return;
+    const updatedAnimal = { ...animal, kogustuguTarih: '' };
+    updateAnimalRecordInDB(updatedAnimal, () => {
+        renderAnimalDetail(updatedAnimal.id);
+    });
+};
+
+window.startAddCalfForMother = function (motherId) {
+    const mother = allDataById.get(Number(motherId));
+    if (!mother) return;
+
+    resetAnimalForm();
+    switchView('addView');
+
+    document.getElementById('formTitle').innerText = `Yeni Buzağı Ekle (Anne: ${mother.kupeNo})`;
+    document.getElementById('dogumTarihi').value = getTodayDateString();
+    document.getElementById('anneKupeNo').value = mother.kupeNo || '';
+    document.getElementById('anneCinsi').value = mother.hayvanCinsi || '';
+
+    if (mother.hayvanResmi) {
+        base64Anne = mother.hayvanResmi;
+        const prevAnne = document.getElementById('previewAnne');
+        prevAnne.src = base64Anne;
+        prevAnne.style.display = 'block';
+        document.getElementById('removeAnneBtn').style.display = 'flex';
+    }
+};
 
 function updateAnimalRecordInDB(updatedAnimal, onSuccess) {
     const tx = db.transaction("kayitlar", "readwrite");
@@ -813,6 +1158,7 @@ function updateAnimalRecordInDB(updatedAnimal, onSuccess) {
         allDataById.set(updatedAnimal.id, updatedAnimal);
         isListDirty = true;
         renderHomeMilkSummary();
+        renderHomeReproductionAlerts();
         if (onSuccess) onSuccess();
     };
 }
