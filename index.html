@@ -158,7 +158,12 @@
                     <div class="grid">
                         <div class="form-group">
                             <label>Hayvanın Resmi</label>
-                            <input type="file" id="hayvanResmi" accept="image/*">
+                            <input type="file" id="hayvanResmi" accept="image/*" style="display: none;">
+                            <input type="file" id="hayvanResmiCamera" accept="image/*" capture="environment" style="display: none;">
+                            <div class="image-source-actions">
+                                <button type="button" class="image-source-btn camera-btn" onclick="openImageCamera('hayvan')">📷 Kamera ile Çek</button>
+                                <button type="button" class="image-source-btn file-btn" onclick="openImageFilePicker('hayvan')">📁 Dosya / Galeri Seç</button>
+                            </div>
                             <div class="preview-container">
                                 <img id="previewHayvan" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
                                 <button type="button" class="remove-img-btn" id="removeHayvanBtn" onclick="removeImage('hayvan')">&times;</button>
@@ -166,7 +171,12 @@
                         </div>
                         <div class="form-group">
                             <label>Anne Resmi</label>
-                            <input type="file" id="anneResmi" accept="image/*">
+                            <input type="file" id="anneResmi" accept="image/*" style="display: none;">
+                            <input type="file" id="anneResmiCamera" accept="image/*" capture="environment" style="display: none;">
+                            <div class="image-source-actions">
+                                <button type="button" class="image-source-btn camera-btn" onclick="openImageCamera('anne')">📷 Kamera ile Çek</button>
+                                <button type="button" class="image-source-btn file-btn" onclick="openImageFilePicker('anne')">📁 Dosya / Galeri Seç</button>
+                            </div>
                             <div class="preview-container">
                                 <img id="previewAnne" class="preview" onclick="openModal(this.src)" title="Büyütmek için tıklayın">
                                 <button type="button" class="remove-img-btn" id="removeAnneBtn" onclick="removeImage('anne')">&times;</button>
@@ -354,6 +364,22 @@
     <div id="imageModal" class="modal" onclick="closeModal()">
         <span class="close-modal">&times;</span>
         <img class="modal-content" id="expandedImg">
+    </div>
+
+    <!-- Kamera ile Fotoğraf Çekme Modalı -->
+    <div id="cameraCaptureModal" class="modal" style="z-index: 10001;">
+        <div class="modal-content camera-capture-card">
+            <div class="camera-modal-header">
+                <h3 id="cameraModalTitle">📷 Fotoğraf Çek</h3>
+                <button type="button" class="camera-close-btn" onclick="closeCameraCaptureModal()">&times;</button>
+            </div>
+            <video id="cameraVideoPreview" autoplay playsinline muted></video>
+            <div class="camera-modal-actions">
+                <button type="button" class="btn-success" onclick="captureCameraPhoto()">📸 Fotoğraf Çek</button>
+                <button type="button" class="btn-info" onclick="switchCameraFacingMode()" title="Ön/Arka Kamera Değiştir">🔄 Çevir</button>
+                <button type="button" class="btn-secondary" onclick="closeCameraCaptureModal()">İptal</button>
+            </div>
+        </div>
     </div>
     <!-- YENİ: Cihaza Yükleme (PWA) Modalı -->
 <div id="installModal" class="modal" style="z-index: 10000;">

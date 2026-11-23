@@ -265,8 +265,53 @@ request.onsuccess = (e) => {
     }
 };
 
-function handleImageUpload(inputId, previewId, isAnne) {
-    document.getElementById(inputId).addEventListener('change', function (e) {
+function compressAndApplyImage(imgSource, isAnne) {
+    const canvas = document.createElement('canvas');
+    const MAX_WIDTH = 800;
+    const MAX_HEIGHT = 800;
+    let width = imgSource.videoWidth || imgSource.width;
+    let height = imgSource.videoHeight || imgSource.height;
+    if (!width || !height) return;
+
+    if (width > height) {
+        if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+        }
+    } else {
+        if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+        }
+    }
+
+    canvas.width = Math.round(width);
+    canvas.height = Math.round(height);
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgSource, 0, 0, canvas.width, canvas.height);
+
+    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+    const previewId = isAnne ? 'previewAnne' : 'previewHayvan';
+
+    if (isAnne) {
+        base64Anne = compressedBase64;
+        document.getElementById('removeAnneBtn').style.display = 'flex';
+    } else {
+        base64Hayvan = compressedBase64;
+        document.getElementById('removeHayvanBtn').style.display = 'flex';
+    }
+
+    const imgObj = document.getElementById(previewId);
+    imgObj.src = compressedBase64;
+    imgObj.style.display = 'block';
+}
+
+function handleImageUpload(inputId, isAnne) {
+    const inputEl = document.getElementById(inputId);
+    if (!inputEl) return;
+
+    inputEl.addEventListener('change', function (e) {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -274,62 +319,164 @@ function handleImageUpload(inputId, previewId, isAnne) {
         reader.onload = function (event) {
             const img = new Image();
             img.onload = function () {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800;
-                const MAX_HEIGHT = 800;
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                    }
-                } else {
-                    if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                    }
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-
-                if (isAnne) {
-                    base64Anne = compressedBase64;
-                    document.getElementById('removeAnneBtn').style.display = 'flex';
-                } else {
-                    base64Hayvan = compressedBase64;
-                    document.getElementById('removeHayvanBtn').style.display = 'flex';
-                }
-
-                const imgObj = document.getElementById(previewId);
-                imgObj.src = compressedBase64;
-                imgObj.style.display = 'block';
+                compressAndApplyImage(img, isAnne);
             };
             img.src = event.target.result;
         };
         reader.readAsDataURL(file);
+        e.target.value = '';
     });
 }
-handleImageUpload('hayvanResmi', 'previewHayvan', false);
-handleImageUpload('anneResmi', 'previewAnne', true);
+handleImageUpload('hayvanResmi', false);
+handleImageUpload('hayvanResmiCamera', false);
+handleImageUpload('anneResmi', true);
+handleImageUpload('anneResmiCamera', true);
+
+let activeCameraStream = null;
+let activeCameraTarget = 'hayvan';
+let activeCameraFacingMode = 'environment';
+
+window.openImageFilePicker = function (type) {
+    const inputId = type === 'anne' ? 'anneResmi' : 'hayvanResmi';
+    document.getElementById(inputId)?.click();
+};
+
+async function startLiveCameraStream(facingMode) {
+    if (activeCameraStream) {
+        activeCameraStream.getTracks().forEach(track => track.stop());
+        activeCameraStream = null;
+    }
+
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode } },
+            audio: false
+        });
+    } catch (firstErr) {
+        if (firstErr && (firstErr.name === 'OverconstrainedError' || firstErr.name === 'NotFoundError')) {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } else {
+            throw firstErr;
+        }
+    }
+
+    activeCameraStream = stream;
+    const videoEl = document.getElementById('cameraVideoPreview');
+    if (videoEl) {
+        videoEl.srcObject = stream;
+        await videoEl.play().catch(() => {});
+    }
+}
+
+window.openImageCamera = async function (type) {
+    const isAnne = type === 'anne';
+    const cameraInputId = isAnne ? 'anneResmiCamera' : 'hayvanResmiCamera';
+    activeCameraTarget = isAnne ? 'anne' : 'hayvan';
+    activeCameraFacingMode = 'environment';
+
+    const modal = document.getElementById('cameraCaptureModal');
+    const titleEl = document.getElementById('cameraModalTitle');
+    if (titleEl) {
+        titleEl.innerText = isAnne ? '📷 Anne Resmi Çek' : '📷 Hayvan Resmi Çek';
+    }
+
+    // Hem mobil hem masaüstünde doğrudan canlı kamerayı uygulama içinde aç
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+            modal.style.display = 'flex';
+            await startLiveCameraStream(activeCameraFacingMode);
+            return;
+        } catch (err) {
+            closeCameraCaptureModal();
+            const isDenied = err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
+            const isNoCamera = err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError');
+            const reasonText = isDenied
+                ? 'Tarayıcıda kamera izni reddedildi. Lütfen adres çubuğundan kamera iznine izin verin.'
+                : (isNoCamera
+                    ? 'Bu cihazda kullanılabilir bir kamera bulunamadı.'
+                    : 'Kamera başlatılamadı. Uygulamanın HTTPS veya localhost üzerinden açıldığından emin olun.');
+
+            Swal.fire({
+                title: 'Kamera Açılamadı',
+                text: reasonText,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Dosyadan Seç',
+                cancelButtonText: 'Kapat',
+                confirmButtonColor: '#0d6efd'
+            }).then(res => {
+                if (res.isConfirmed) {
+                    openImageFilePicker(activeCameraTarget);
+                }
+            });
+            return;
+        }
+    }
+
+    // navigator.mediaDevices yoksa (örn. güvenli olmayan HTTP bağlantısı)
+    const isTouchMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && navigator.maxTouchPoints > 0;
+    if (isTouchMobile) {
+        document.getElementById(cameraInputId)?.click();
+    } else {
+        Swal.fire({
+            title: 'Canlı Kamera Kullanılamıyor',
+            text: 'Tarayıcı güvenlik kuralları gereği canlı kamera yalnızca HTTPS veya localhost üzerinden çalışır.',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Dosyadan Seç',
+            cancelButtonText: 'Kapat'
+        }).then(res => {
+            if (res.isConfirmed) {
+                openImageFilePicker(activeCameraTarget);
+            }
+        });
+    }
+};
+
+window.switchCameraFacingMode = async function () {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    activeCameraFacingMode = activeCameraFacingMode === 'environment' ? 'user' : 'environment';
+    try {
+        await startLiveCameraStream(activeCameraFacingMode);
+    } catch (_) {
+        // Tek kameralı cihazlarda mevcut kamerada kal
+        activeCameraFacingMode = activeCameraFacingMode === 'environment' ? 'user' : 'environment';
+        await startLiveCameraStream(activeCameraFacingMode).catch(() => {});
+    }
+};
+
+window.captureCameraPhoto = function () {
+    const videoEl = document.getElementById('cameraVideoPreview');
+    if (!videoEl || !videoEl.videoWidth) return;
+
+    compressAndApplyImage(videoEl, activeCameraTarget === 'anne');
+    closeCameraCaptureModal();
+};
+
+window.closeCameraCaptureModal = function () {
+    if (activeCameraStream) {
+        activeCameraStream.getTracks().forEach(track => track.stop());
+        activeCameraStream = null;
+    }
+    const videoEl = document.getElementById('cameraVideoPreview');
+    if (videoEl) videoEl.srcObject = null;
+    const modal = document.getElementById('cameraCaptureModal');
+    if (modal) modal.style.display = 'none';
+};
 
 window.removeImage = function (type) {
     if (type === 'hayvan') {
         base64Hayvan = "";
         document.getElementById('hayvanResmi').value = "";
+        document.getElementById('hayvanResmiCamera').value = "";
         document.getElementById('previewHayvan').style.display = 'none';
         document.getElementById('removeHayvanBtn').style.display = 'none';
         document.getElementById('previewHayvan').src = "";
     } else if (type === 'anne') {
         base64Anne = "";
         document.getElementById('anneResmi').value = "";
+        document.getElementById('anneResmiCamera').value = "";
         document.getElementById('previewAnne').style.display = 'none';
         document.getElementById('removeAnneBtn').style.display = 'none';
         document.getElementById('previewAnne').src = "";
