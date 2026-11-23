@@ -398,6 +398,8 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         milkRecords: [],
         healthRecords: [],
         weightRecords: [],
+        breedingRecords: [],
+        lactationCount: 0,
         tags: [],
         notes: ''
     };
@@ -413,6 +415,8 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             data.milkRecords = Array.isArray(existingRecord.milkRecords) ? existingRecord.milkRecords : [];
             data.healthRecords = Array.isArray(existingRecord.healthRecords) ? existingRecord.healthRecords : [];
             data.weightRecords = Array.isArray(existingRecord.weightRecords) ? existingRecord.weightRecords : [];
+            data.breedingRecords = Array.isArray(existingRecord.breedingRecords) ? existingRecord.breedingRecords : [];
+            data.lactationCount = Number(existingRecord.lactationCount) || 0;
             data.tags = Array.isArray(existingRecord.tags) ? existingRecord.tags : [];
             data.notes = existingRecord.notes || '';
         }
@@ -653,6 +657,29 @@ function getAnimalLatestMilkScore(row) {
 function getAnimalLatestWeight(row) {
     const records = getWeightRecords(row);
     return records.length ? (Number(records[0].weight) || 0) : -1;
+}
+
+const BREEDING_OUTCOME_META = {
+    pending: { label: '⏳ Gebelik Kontrolü Bekleniyor', cls: 'breeding-outcome-pending' },
+    confirmed: { label: '🤰 Gebe (Tuttu)', cls: 'breeding-outcome-confirmed' },
+    failed: { label: '❌ Tutmadı', cls: 'breeding-outcome-failed' },
+    calved: { label: '🐮 Doğum Yaptı', cls: 'breeding-outcome-calved' }
+};
+
+function getBreedingRecords(row) {
+    if (!row || !Array.isArray(row.breedingRecords)) return [];
+    return [...row.breedingRecords].sort((a, b) => {
+        const cmp = String(b.date || '').localeCompare(String(a.date || ''));
+        return cmp !== 0 ? cmp : String(b.id || '').localeCompare(String(a.id || ''));
+    });
+}
+
+function getEffectiveLactationCount(animal) {
+    if (!animal || animal.cinsiyet !== 'Dişi') return 0;
+    const stored = Number(animal.lactationCount) || 0;
+    const calvedFromBreeding = getBreedingRecords(animal).filter(r => r.outcome === 'calved').length;
+    const offspringCount = findOffspringAnimals(animal).length;
+    return Math.max(stored, calvedFromBreeding, offspringCount);
 }
 
 function getMilkRecords(row) {
@@ -1134,8 +1161,16 @@ function renderAnimalDetail(id) {
     }
 
     const pregnancyInfo = getPregnancyInfo(animal);
+    const breedingRecords = isFemale ? getBreedingRecords(animal) : [];
     let reproductionSectionHtml = '';
     if (isFemale) {
+        const lactationCount = getEffectiveLactationCount(animal);
+        const confirmedOrCalved = breedingRecords.filter(r => r.outcome === 'confirmed' || r.outcome === 'calved').length;
+        const decidedCount = breedingRecords.filter(r => r.outcome === 'confirmed' || r.outcome === 'calved' || r.outcome === 'failed').length;
+        const conceptionRate = decidedCount > 0 ? Math.round((confirmedOrCalved / decidedCount) * 100) : null;
+        const attemptsPerPregnancy = confirmedOrCalved > 0 ? breedingRecords.length / confirmedOrCalved : null;
+        const todayForBreeding = getTodayDateString();
+
         let reproBodyHtml = '';
         if (!pregnancyInfo) {
             reproBodyHtml = '<div class="repro-banner repro-banner-info">Koğuşma / tohumlama tarihi girildiğinde tahmini doğum (~283 gün) ve kuruya çekme (~60 gün önce) tarihleri otomatik hesaplanır.</div>';
@@ -1183,20 +1218,141 @@ function renderAnimalDetail(id) {
             `;
         }
 
+        const breedingHistoryHtml = breedingRecords.length === 0
+            ? '<div class="milk-empty-state">Henüz tohumlama / aşım geçmişi eklenmedi. Yukarıdaki formdan sperma/boğa ve sonuç kaydı ekleyebilirsiniz.</div>'
+            : `<div class="health-history-list">${breedingRecords.map(rec => {
+                const outcomeMeta = BREEDING_OUTCOME_META[rec.outcome] || BREEDING_OUTCOME_META.pending;
+                const methodLabel = rec.method === 'natural' ? '🐂 Doğal Aşım' : '🧪 Suni Tohumlama';
+                const estBirth = addDaysToDateStr(rec.date, GESTATION_DAYS);
+                const safeRecId = escapeHtml(rec.id);
+                const quickOutcomeBtns = (rec.outcome === 'pending' || rec.outcome === 'confirmed')
+                    ? `
+                        <div class="breeding-quick-actions">
+                            ${rec.outcome === 'pending' ? `<button type="button" class="btn-info" onclick="updateBreedingOutcome(${animal.id}, '${safeRecId}', 'confirmed')">🤰 Gebe (Tuttu)</button>` : ''}
+                            <button type="button" class="btn-danger" onclick="updateBreedingOutcome(${animal.id}, '${safeRecId}', 'failed')">❌ Tutmadı</button>
+                            <button type="button" class="btn-success" onclick="updateBreedingOutcome(${animal.id}, '${safeRecId}', 'calved')">🐮 Doğum Yaptı</button>
+                        </div>
+                    `
+                    : '';
+
+                return `
+                    <div class="health-history-item">
+                        <div class="health-history-top">
+                            <div class="health-history-title-wrap">
+                                <span class="breeding-outcome-badge ${outcomeMeta.cls}">${outcomeMeta.label}</span>
+                                <span class="health-record-title">${methodLabel}${rec.bullName ? ` — ${escapeHtml(rec.bullName)}` : ''}</span>
+                            </div>
+                            <div class="milk-history-actions">
+                                <button type="button" class="btn-info" onclick="editBreedingRecord(${animal.id}, '${safeRecId}')" title="Düzenle">✏️</button>
+                                <button type="button" class="btn-danger" onclick="deleteBreedingRecord(${animal.id}, '${safeRecId}')" title="Sil">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="health-record-meta">
+                            <span>📅 Tohumlama: <strong>${formatDateTR(rec.date)}</strong></span>
+                            ${(rec.outcome === 'pending' || rec.outcome === 'confirmed') ? `<span>🗓️ Tahmini Doğum: <strong>${formatDateTR(estBirth)}</strong></span>` : ''}
+                            ${rec.outcome === 'calved' && rec.calvingDate ? `<span>🐮 Doğum Tarihi: <strong>${formatDateTR(rec.calvingDate)}</strong></span>` : ''}
+                        </div>
+                        ${rec.notes ? `<div class="health-record-notes">${escapeHtml(rec.notes)}</div>` : ''}
+                        ${quickOutcomeBtns}
+                    </div>
+                `;
+            }).join('')}</div>`;
+
         reproductionSectionHtml = `
             <div class="card">
                 <div class="milk-section-header">
-                    <h3>🤰 Üreme & Doğum Takibi</h3>
+                    <h3>🤰 Gebelik & Doğum Takibi</h3>
                 </div>
+
+                <div class="lactation-bar">
+                    <div class="lactation-info">
+                        <span class="lactation-title">🔄 Laktasyon / Doğum Sayısı: ${lactationCount > 0 ? `${lactationCount}. Laktasyon` : 'Henüz doğum yok (Düve)'}</span>
+                        <span class="lactation-sub">Kayıtlı doğumlar ve yavrulardan otomatik hesaplanır; gerekirse manuel ayarlanabilir.</span>
+                    </div>
+                    <div class="lactation-stepper">
+                        <button type="button" onclick="adjustLactationCount(${animal.id}, -1)" title="Azalt">−</button>
+                        <span>${lactationCount}</span>
+                        <button type="button" onclick="adjustLactationCount(${animal.id}, 1)" title="Artır">+</button>
+                    </div>
+                </div>
+
                 <form class="repro-form-row" onsubmit="saveBreedingDate(event, ${animal.id})">
                     <div class="form-group">
-                        <label for="detailBreedingDate">Koğuştuğu / Tohumlama Tarihi</label>
+                        <label for="detailBreedingDate">Aktif Koğuşma / Tohumlama Tarihi</label>
                         <input type="date" id="detailBreedingDate" value="${animal.kogustuguTarih || ''}">
                     </div>
                     <button type="submit" class="btn-primary" style="width: auto;">Tarihi Kaydet</button>
                     ${animal.kogustuguTarih ? `<button type="button" class="btn-secondary" onclick="clearBreedingDate(${animal.id})">Temizle</button>` : ''}
                 </form>
                 ${reproBodyHtml}
+            </div>
+
+            <div class="card">
+                <div class="milk-section-header">
+                    <h3>🧪 Tohumlama & Döl Verimi Geçmişi</h3>
+                </div>
+
+                ${breedingRecords.length > 0 ? `
+                    <div class="milk-stats-grid" style="margin-top: 0;">
+                        <div class="milk-stat-card">
+                            <span class="milk-stat-label">Toplam Tohumlama</span>
+                            <span class="milk-stat-value">${breedingRecords.length}</span>
+                        </div>
+                        <div class="milk-stat-card">
+                            <span class="milk-stat-label">Tutma Oranı</span>
+                            <span class="milk-stat-value">${conceptionRate !== null ? `%${conceptionRate}` : '-'}</span>
+                        </div>
+                        <div class="milk-stat-card">
+                            <span class="milk-stat-label">Gebelik Başı Tohumlama</span>
+                            <span class="milk-stat-value">${attemptsPerPregnancy !== null ? formatLiters(attemptsPerPregnancy) : '-'}</span>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <form id="breedingEntryForm" onsubmit="saveBreedingRecord(event, ${animal.id})">
+                    <input type="hidden" id="breedingEditId" value="">
+                    <div class="health-form-grid">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="breedingRecDate">Tohumlama / Aşım Tarihi</label>
+                            <input type="date" id="breedingRecDate" value="${todayForBreeding}" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="breedingRecMethod">Yöntem</label>
+                            <select id="breedingRecMethod">
+                                <option value="ai">🧪 Suni Tohumlama</option>
+                                <option value="natural">🐂 Doğal Aşım (Boğa)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="breedingBullName">Boğa / Sperma Adı</label>
+                            <input type="text" id="breedingBullName" placeholder="Örn. Simental Kaan, TR-45">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="breedingRecOutcome">Sonuç / Durum</label>
+                            <select id="breedingRecOutcome" onchange="toggleBreedingCalvingDateField()">
+                                <option value="pending">⏳ Gebelik Kontrolü Bekleniyor</option>
+                                <option value="confirmed">🤰 Gebe (Tuttu)</option>
+                                <option value="failed">❌ Tutmadı</option>
+                                <option value="calved">🐮 Doğum Yaptı</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-span" id="breedingCalvingDateGroup" style="margin-bottom: 0; display: none;">
+                            <label for="breedingCalvingDate">Gerçekleşen Doğum Tarihi</label>
+                            <input type="date" id="breedingCalvingDate" value="${todayForBreeding}">
+                        </div>
+                        <div class="form-group full-span" style="margin-bottom: 0;">
+                            <label for="breedingRecNotes">Not (İsteğe Bağlı)</label>
+                            <input type="text" id="breedingRecNotes" placeholder="Veteriner adı, kızgınlık gözlemi, buzağı bilgisi...">
+                        </div>
+                    </div>
+                    <div class="health-form-actions">
+                        <button type="submit" id="breedingSubmitBtn" class="btn-primary" style="flex: 1;">💾 Tohumlama Kaydını Kaydet</button>
+                        <button type="button" id="breedingCancelEditBtn" class="btn-secondary" style="display: none;" onclick="resetBreedingForm()">İptal</button>
+                    </div>
+                </form>
+
+                <h4 class="milk-history-title">Tohumlama Tarihçesi</h4>
+                ${breedingHistoryHtml}
             </div>
         `;
     }
@@ -1516,7 +1672,7 @@ function renderAnimalDetail(id) {
         { key: 'general', label: '📋 Genel', count: 0 },
         ...(isFemale ? [
             { key: 'milk', label: '🥛 Süt', count: milkRecordsCount },
-            { key: 'reproduction', label: '🤰 Üreme', count: 0 }
+            { key: 'reproduction', label: '🤰 Üreme', count: breedingRecords.length }
         ] : []),
         { key: 'health', label: '💉 Sağlık', count: healthRecords.length },
         { key: 'weightNotes', label: '⚖️ Ağırlık & Not', count: weightRecords.length }
@@ -2812,6 +2968,201 @@ window.clearBreedingDate = function (id) {
     const updatedAnimal = { ...animal, kogustuguTarih: '' };
     updateAnimalRecordInDB(updatedAnimal, () => {
         renderAnimalDetail(updatedAnimal.id);
+    });
+};
+
+function syncActiveKogustuguDateFromRecords(animal, records) {
+    const latestActive = records.find(r => r.outcome === 'confirmed' || r.outcome === 'pending');
+    if (latestActive) return latestActive.date;
+    return '';
+}
+
+window.adjustLactationCount = function (animalId, delta) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal || animal.cinsiyet !== 'Dişi') return;
+    const current = getEffectiveLactationCount(animal);
+    const next = Math.max(0, current + delta);
+    updateAnimalRecordInDB({ ...animal, lactationCount: next }, () => {
+        renderAnimalDetail(animal.id);
+    });
+};
+
+window.toggleBreedingCalvingDateField = function () {
+    const outcomeEl = document.getElementById('breedingRecOutcome');
+    const groupEl = document.getElementById('breedingCalvingDateGroup');
+    if (!outcomeEl || !groupEl) return;
+    groupEl.style.display = outcomeEl.value === 'calved' ? 'block' : 'none';
+};
+
+window.resetBreedingForm = function () {
+    const form = document.getElementById('breedingEntryForm');
+    if (form) form.reset();
+    const editIdEl = document.getElementById('breedingEditId');
+    const dateEl = document.getElementById('breedingRecDate');
+    const calvingEl = document.getElementById('breedingCalvingDate');
+    const submitBtn = document.getElementById('breedingSubmitBtn');
+    const cancelBtn = document.getElementById('breedingCancelEditBtn');
+    if (editIdEl) editIdEl.value = '';
+    if (dateEl) dateEl.value = getTodayDateString();
+    if (calvingEl) calvingEl.value = getTodayDateString();
+    if (submitBtn) submitBtn.innerText = '💾 Tohumlama Kaydını Kaydet';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    toggleBreedingCalvingDateField();
+};
+
+window.saveBreedingRecord = function (event, animalId) {
+    event.preventDefault();
+    const animal = allDataById.get(Number(animalId));
+    if (!animal || animal.cinsiyet !== 'Dişi') return;
+
+    const editId = document.getElementById('breedingEditId')?.value || '';
+    const date = document.getElementById('breedingRecDate')?.value || '';
+    const method = document.getElementById('breedingRecMethod')?.value || 'ai';
+    const bullName = document.getElementById('breedingBullName')?.value.trim() || '';
+    const outcome = document.getElementById('breedingRecOutcome')?.value || 'pending';
+    const calvingDate = outcome === 'calved' ? (document.getElementById('breedingCalvingDate')?.value || getTodayDateString()) : '';
+    const notes = document.getElementById('breedingRecNotes')?.value.trim() || '';
+
+    if (!date) {
+        Swal.fire({ title: 'Uyarı', text: 'Lütfen tohumlama / aşım tarihini girin.', icon: 'warning', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const recordObj = {
+        id: editId || `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date,
+        method,
+        bullName,
+        outcome,
+        calvingDate,
+        notes
+    };
+
+    const existing = getBreedingRecords(animal).filter(r => r.id !== recordObj.id);
+    existing.push(recordObj);
+    existing.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+    const nextKogustugu = syncActiveKogustuguDateFromRecords(animal, existing);
+    const calvedCount = existing.filter(r => r.outcome === 'calved').length;
+    const nextLactation = Math.max(Number(animal.lactationCount) || 0, calvedCount);
+    const nextIsMilking = outcome === 'calved' ? true : Boolean(animal.isMilking);
+
+    const updatedAnimal = {
+        ...animal,
+        breedingRecords: existing,
+        kogustuguTarih: nextKogustugu,
+        lactationCount: nextLactation,
+        isMilking: nextIsMilking
+    };
+
+    updateAnimalRecordInDB(updatedAnimal, () => {
+        renderAnimalDetail(animal.id);
+        Swal.fire({
+            title: editId ? 'Güncellendi!' : 'Kaydedildi!',
+            text: 'Tohumlama kaydı işlendi.',
+            icon: 'success',
+            timer: 1400,
+            showConfirmButton: false
+        });
+    });
+};
+
+window.updateBreedingOutcome = function (animalId, recordId, newOutcome) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal || animal.cinsiyet !== 'Dişi') return;
+
+    const records = getBreedingRecords(animal);
+    const target = records.find(r => r.id === recordId);
+    if (!target) return;
+
+    const today = getTodayDateString();
+    const updatedRecords = records.map(r => {
+        if (r.id !== recordId) return r;
+        return {
+            ...r,
+            outcome: newOutcome,
+            calvingDate: newOutcome === 'calved' ? (r.calvingDate || today) : ''
+        };
+    });
+
+    const nextKogustugu = syncActiveKogustuguDateFromRecords(animal, updatedRecords);
+    const currentLactation = getEffectiveLactationCount(animal);
+    const nextLactation = newOutcome === 'calved' ? currentLactation + 1 : (Number(animal.lactationCount) || 0);
+    const nextIsMilking = newOutcome === 'calved' ? true : Boolean(animal.isMilking);
+
+    const updatedAnimal = {
+        ...animal,
+        breedingRecords: updatedRecords,
+        kogustuguTarih: nextKogustugu,
+        lactationCount: nextLactation,
+        isMilking: nextIsMilking
+    };
+
+    updateAnimalRecordInDB(updatedAnimal, () => {
+        renderAnimalDetail(animal.id);
+        if (newOutcome === 'calved') {
+            Swal.fire({
+                title: 'Tebrikler! Doğum Kaydedildi 🐮',
+                text: 'İnek yeni laktasyona (sağılır) alındı. Şimdi doğan buzağıyı eklemek ister misiniz?',
+                icon: 'success',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                confirmButtonText: 'Evet, Buzağı Ekle',
+                cancelButtonText: 'Daha Sonra'
+            }).then(res => {
+                if (res.isConfirmed) {
+                    startAddCalfForMother(animal.id);
+                }
+            });
+        }
+    });
+};
+
+window.editBreedingRecord = function (animalId, recordId) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+    const rec = getBreedingRecords(animal).find(r => r.id === recordId);
+    if (!rec) return;
+
+    document.getElementById('breedingEditId').value = rec.id;
+    document.getElementById('breedingRecDate').value = rec.date || getTodayDateString();
+    document.getElementById('breedingRecMethod').value = rec.method || 'ai';
+    document.getElementById('breedingBullName').value = rec.bullName || '';
+    document.getElementById('breedingRecOutcome').value = rec.outcome || 'pending';
+    document.getElementById('breedingCalvingDate').value = rec.calvingDate || getTodayDateString();
+    document.getElementById('breedingRecNotes').value = rec.notes || '';
+    toggleBreedingCalvingDateField();
+    document.getElementById('breedingSubmitBtn').innerText = '💾 Kaydı Güncelle';
+    document.getElementById('breedingCancelEditBtn').style.display = 'inline-block';
+
+    const formEl = document.getElementById('breedingEntryForm');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+window.deleteBreedingRecord = function (animalId, recordId) {
+    const animal = allDataById.get(Number(animalId));
+    if (!animal) return;
+    const rec = getBreedingRecords(animal).find(r => r.id === recordId);
+    if (!rec) return;
+
+    Swal.fire({
+        title: 'Tohumlama kaydını sil?',
+        text: `${formatDateTR(rec.date)} tarihli tohumlama kaydı silinecek.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Evet, Sil',
+        cancelButtonText: 'İptal'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const remaining = getBreedingRecords(animal).filter(r => r.id !== recordId);
+        const nextKogustugu = remaining.length > 0
+            ? syncActiveKogustuguDateFromRecords(animal, remaining)
+            : (animal.kogustuguTarih === rec.date ? '' : animal.kogustuguTarih);
+        updateAnimalRecordInDB({ ...animal, breedingRecords: remaining, kogustuguTarih: nextKogustugu }, () => {
+            renderAnimalDetail(animal.id);
+        });
     });
 };
 
