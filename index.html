@@ -43,6 +43,7 @@
         <!-- 1. BÖLÜM: ANA SAYFA DÜĞMELERİ (DASHBOARD) -->
         <div id="homeView" class="view-section">
             <h2 style="text-align: center; color: #333; margin-bottom: 16px;">🐄 Çiftlik Yönetim Paneli</h2>
+            <div id="homeHerdStats" class="home-herd-stats"></div>
             <div id="homeMilkSummary" class="home-milk-summary"></div>
             <div id="homeReproductionAlerts" class="home-repro-alerts"></div>
             <div id="homeHealthAlerts" class="home-health-alerts"></div>
@@ -252,6 +253,22 @@
                         <button class="btn-primary" id="btnScanQR" style="background: #6f42c1; width: 100%;" onclick="toggleQRScanner()">Kamerayı Aç ve Okut</button>
                         <div id="reader" style="width: 100%; margin-top: 15px; display: none;"></div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 style="margin-top: 0;">📊 Excel / CSV Rapor İndir</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">Kayıtlarınızı Microsoft Excel veya Google E-Tablolar ile açılabilir CSV dosyası olarak indirebilirsiniz.</p>
+                <div class="export-csv-grid">
+                    <button type="button" class="btn-success" onclick="exportAnimalsCSV()">📋 Hayvan Listesi (CSV)</button>
+                    <button type="button" class="btn-info" onclick="exportHealthCSV()">💉 Sağlık & Aşı Raporu (CSV)</button>
+                </div>
+                <div class="export-milk-row">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1 1 180px;">
+                        <label for="exportMilkMonth">Süt Raporu Ayı (Boş bırakılırsa tüm kayıtlar)</label>
+                        <input type="month" id="exportMilkMonth">
+                    </div>
+                    <button type="button" class="btn-primary" style="width: auto; margin: 0;" onclick="exportMilkCSV()">🥛 Süt Kayıtları (CSV)</button>
                 </div>
             </div>
 

@@ -127,9 +127,15 @@ function switchView(viewId, updateHistory = true, animalId = null) {
     // 5. İlgili ekran açıldığında verileri/kartları yükle
     if (viewId === 'homeView') {
         if (isDataLoaded) {
+            renderHomeHerdStats();
             renderHomeMilkSummary();
             renderHomeReproductionAlerts();
             renderHomeHealthAlerts();
+        }
+    } else if (viewId === 'syncView') {
+        const monthInput = document.getElementById('exportMilkMonth');
+        if (monthInput && !monthInput.value) {
+            monthInput.value = getTodayDateString().slice(0, 7);
         }
     } else if (viewId === 'listView') {
         if (!isDataLoaded) {
@@ -530,6 +536,70 @@ function getMilkRecords(row) {
     return [...row.milkRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 }
 
+function calculateAgeInfo(birthDateStr) {
+    if (!birthDateStr) return null;
+    const parts = String(birthDateStr).split('-').map(Number);
+    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
+
+    const now = new Date();
+    const todayY = now.getFullYear();
+    const todayM = now.getMonth() + 1;
+    const todayD = now.getDate();
+
+    const birthY = parts[0];
+    const birthM = parts[1];
+    const birthD = parts[2];
+
+    const birthDate = new Date(birthY, birthM - 1, birthD);
+    const todayDate = new Date(todayY, todayM - 1, todayD);
+    if (birthDate > todayDate) {
+        return { totalMonths: 0, years: 0, months: 0, days: 0, label: 'Gelecek tarih' };
+    }
+
+    let years = todayY - birthY;
+    let months = todayM - birthM;
+    let days = todayD - birthD;
+
+    if (days < 0) {
+        const prevMonthLastDay = new Date(todayY, todayM - 1, 0).getDate();
+        days += prevMonthLastDay;
+        months -= 1;
+    }
+    if (months < 0) {
+        months += 12;
+        years -= 1;
+    }
+
+    const totalMonths = years * 12 + months;
+    let label = '';
+    if (totalMonths === 0) {
+        label = days === 0 ? 'Yeni doğan' : `${days} günlük`;
+    } else if (years === 0) {
+        label = `${months} aylık`;
+    } else if (months === 0) {
+        label = `${years} yaş`;
+    } else {
+        label = `${years} yıl ${months} ay`;
+    }
+
+    return { totalMonths, years, months, days, label };
+}
+
+function getAnimalAgeGroup(animal) {
+    const age = calculateAgeInfo(animal?.dogumTarihi);
+    if (!age) return 'unknown';
+    if (age.totalMonths < 6) return 'calf';
+    if (animal.cinsiyet === 'Erkek') return 'maleYoungOrAdult';
+    if (animal.cinsiyet === 'Dişi') {
+        const hasCalved = findOffspringAnimals(animal).length > 0;
+        if (age.totalMonths < 24 && !isAnimalMilking(animal) && !hasCalved) {
+            return 'heifer';
+        }
+        return 'cow';
+    }
+    return 'unknown';
+}
+
 function loadData() {
     if (!db) return;
     isDataLoading = true;
@@ -544,6 +614,7 @@ function loadData() {
         allDataById = new Map(allData.map(row => [row.id, row]));
         const activeCount = allData.filter(row => !row.herdStatus || row.herdStatus === 'active').length;
         document.getElementById('totalCount').innerText = "Sürüdeki Hayvan Sayısı: " + activeCount;
+        renderHomeHerdStats();
         renderHomeMilkSummary();
         renderHomeReproductionAlerts();
         renderHomeHealthAlerts();
@@ -677,8 +748,9 @@ function renderTable() {
                     <div class="card-info-row"><strong>Lakap:</strong> <span>${escapeHtml(row.hayvanLakabi || '-')}</span></div>
                     <div class="card-info-row"><strong>Cinsiyet:</strong> <span>${escapeHtml(row.cinsiyet)}</span></div>
                     <div class="card-info-row"><strong>Irk:</strong> <span>${escapeHtml(row.hayvanCinsi)}</span></div>
-                    <div class="card-info-row"><strong>Doğum Tarihi:</strong> <span>${row.dogumTarihi || '-'}</span></div>
-                    <div class="card-info-row"><strong>Koğuştuğu Tarih:</strong> <span>${row.kogustuguTarih || '-'}</span></div>
+                    <div class="card-info-row"><strong>Doğum Tarihi:</strong> <span>${formatDateTR(row.dogumTarihi)}</span></div>
+                    <div class="card-info-row"><strong>Yaş:</strong> <span>${calculateAgeInfo(row.dogumTarihi)?.label || '-'}</span></div>
+                    <div class="card-info-row"><strong>Koğuştuğu Tarih:</strong> <span>${formatDateTR(row.kogustuguTarih)}</span></div>
                     ${calvingRowHtml}
                     <div class="card-info-row"><strong>Anne Küpe No:</strong> <span>${escapeHtml(row.anneKupeNo || '-')}</span></div>
                     ${latestMilkHtml}
@@ -1159,6 +1231,10 @@ function renderAnimalDetail(id) {
                     <span class="detail-info-value">${formatDateTR(animal.dogumTarihi)}</span>
                 </div>
                 <div class="detail-info-item">
+                    <span class="detail-info-label">Yaş</span>
+                    <span class="detail-info-value">${calculateAgeInfo(animal.dogumTarihi)?.label || '-'}</span>
+                </div>
+                <div class="detail-info-item">
                     <span class="detail-info-label">Koğuştuğu Tarih</span>
                     <span class="detail-info-value">${formatDateTR(animal.kogustuguTarih)}</span>
                 </div>
@@ -1509,12 +1585,228 @@ function updateAnimalRecordInDB(updatedAnimal, onSuccess) {
         }
         allDataById.set(updatedAnimal.id, updatedAnimal);
         isListDirty = true;
+        renderHomeHerdStats();
         renderHomeMilkSummary();
         renderHomeReproductionAlerts();
         renderHomeHealthAlerts();
         if (onSuccess) onSuccess();
     };
 }
+
+function renderHomeHerdStats() {
+    const container = document.getElementById('homeHerdStats');
+    if (!container) return;
+
+    const activeAnimals = allData.filter(row => !row.herdStatus || row.herdStatus === 'active');
+    const femaleCount = activeAnimals.filter(r => r.cinsiyet === 'Dişi').length;
+    const maleCount = activeAnimals.filter(r => r.cinsiyet === 'Erkek').length;
+    const milkingCount = activeAnimals.filter(r => isAnimalMilking(r)).length;
+    const pregnantCount = activeAnimals.filter(r => {
+        const info = getPregnancyInfo(r);
+        return info && !info.isStale && info.daysUntilCalving >= -14;
+    }).length;
+
+    let calfCount = 0;
+    let heiferCount = 0;
+    let cowCount = 0;
+    let maleOlderCount = 0;
+    activeAnimals.forEach(animal => {
+        const grp = getAnimalAgeGroup(animal);
+        if (grp === 'calf') calfCount += 1;
+        else if (grp === 'heifer') heiferCount += 1;
+        else if (grp === 'cow') cowCount += 1;
+        else if (grp === 'maleYoungOrAdult') maleOlderCount += 1;
+    });
+
+    const soldAnimals = allData.filter(r => r.herdStatus === 'sold');
+    const totalSaleRevenue = soldAnimals.reduce((sum, r) => sum + (Number(r.salePrice) || 0), 0);
+    const totalHealthExpense = allData.reduce((sum, animal) => {
+        return sum + getHealthRecords(animal).reduce((s, rec) => s + (Number(rec.cost) || 0), 0);
+    }, 0);
+
+    container.innerHTML = `
+        <div class="home-stats-card">
+            <div class="home-stats-header">
+                <h3>📊 Sürü Özet Paneli</h3>
+            </div>
+            <div class="home-stats-grid">
+                <div class="home-stat-box">
+                    <span class="home-stat-box-label">Aktif Sürü</span>
+                    <span class="home-stat-box-value">${activeAnimals.length}</span>
+                    <span class="home-stat-box-sub">♀️ ${femaleCount} Dişi · ♂️ ${maleCount} Erkek</span>
+                </div>
+                <div class="home-stat-box">
+                    <span class="home-stat-box-label">Sağılır / Gebe</span>
+                    <span class="home-stat-box-value">${milkingCount} / ${pregnantCount}</span>
+                    <span class="home-stat-box-sub">🥛 Sağılır · 🤰 Gebe</span>
+                </div>
+                <div class="home-stat-box">
+                    <span class="home-stat-box-label">Toplam Satış</span>
+                    <span class="home-stat-box-value" style="color: #198754;">${totalSaleRevenue.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</span>
+                    <span class="home-stat-box-sub">${soldAnimals.length} satılan hayvan</span>
+                </div>
+                <div class="home-stat-box">
+                    <span class="home-stat-box-label">Sağlık Gideri</span>
+                    <span class="home-stat-box-value" style="color: #b45309;">${totalHealthExpense.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</span>
+                    <span class="home-stat-box-sub">Aşı & tedavi toplamı</span>
+                </div>
+            </div>
+            <div class="herd-age-pills">
+                <span class="herd-age-pill">🐮 Buzağı (&lt;6 ay): ${calfCount}</span>
+                <span class="herd-age-pill">🐄 Düve (6-24 ay): ${heiferCount}</span>
+                <span class="herd-age-pill">🥛 İnek: ${cowCount}</span>
+                <span class="herd-age-pill">🐂 Erkek (6+ ay): ${maleOlderCount}</span>
+            </div>
+        </div>
+    `;
+}
+
+function escapeCsvCell(value) {
+    const str = String(value ?? '');
+    if (/[;"\r\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+}
+
+function downloadCsvFile(filename, headers, rows) {
+    const lines = [
+        headers.map(escapeCsvCell).join(';'),
+        ...rows.map(row => row.map(escapeCsvCell).join(';'))
+    ];
+    const csvContent = '\uFEFF' + lines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+window.exportAnimalsCSV = function () {
+    if (!allData.length) {
+        Swal.fire({ title: 'Bilgi', text: 'Dışa aktarılacak hayvan kaydı bulunmuyor.', icon: 'info', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    const exitLabels = { sold: 'Satıldı', dead: 'Öldü', transferred: 'Başka işletmeye geçti' };
+    const headers = [
+        'Küpe No', 'Lakap', 'Cinsiyet', 'Irk', 'Doğum Tarihi', 'Yaş',
+        'Sürü Durumu', 'Sağılır', 'Koğuştuğu Tarih', 'Tahmini Doğum Tarihi',
+        'Anne Küpe No', 'Anne Irkı', 'Çıkış Tarihi', 'Satış Fiyatı (TL)',
+        'Toplam Süt (L)', 'Toplam Sağlık Maliyeti (TL)'
+    ];
+
+    const rows = allData.map(animal => {
+        const isActive = !animal.herdStatus || animal.herdStatus === 'active';
+        const ageInfo = calculateAgeInfo(animal.dogumTarihi);
+        const preg = getPregnancyInfo(animal);
+        const totalMilk = getMilkRecords(animal).reduce((sum, r) => sum + (Number(r.morning) || 0) + (Number(r.evening) || 0), 0);
+        const totalHealthCost = getHealthRecords(animal).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+
+        return [
+            animal.kupeNo || '',
+            animal.hayvanLakabi || '',
+            animal.cinsiyet || '',
+            animal.hayvanCinsi || '',
+            formatDateTR(animal.dogumTarihi),
+            ageInfo ? ageInfo.label : '',
+            isActive ? 'Aktif Sürüde' : (exitLabels[animal.herdStatus] || 'Sürüden çıktı'),
+            isAnimalMilking(animal) ? 'Evet' : 'Hayır',
+            animal.kogustuguTarih ? formatDateTR(animal.kogustuguTarih) : '',
+            preg && !preg.isStale ? formatDateTR(preg.estimatedCalvingDate) : '',
+            animal.anneKupeNo || '',
+            animal.anneCinsi || '',
+            animal.exitDate ? formatDateTR(animal.exitDate) : '',
+            animal.herdStatus === 'sold' ? formatLiters(animal.salePrice || 0) : '',
+            totalMilk > 0 ? formatLiters(totalMilk) : '',
+            totalHealthCost > 0 ? formatLiters(totalHealthCost) : ''
+        ];
+    });
+
+    const today = getTodayDateString();
+    downloadCsvFile(`Ciftlik_Hayvan_Listesi_${today}.csv`, headers, rows);
+    Swal.fire({ title: 'İndirildi!', text: `${rows.length} hayvan kaydı CSV (Excel) olarak indirildi.`, icon: 'success', timer: 1600, showConfirmButton: false });
+};
+
+window.exportMilkCSV = function () {
+    const selectedMonth = document.getElementById('exportMilkMonth')?.value || '';
+    const headers = ['Tarih', 'Küpe No', 'Lakap', 'Irk', 'Sabah (L)', 'Akşam (L)', 'Günlük Toplam (L)'];
+    const entries = [];
+
+    allData.forEach(animal => {
+        if (animal.cinsiyet !== 'Dişi') return;
+        getMilkRecords(animal).forEach(rec => {
+            if (selectedMonth && !String(rec.date || '').startsWith(selectedMonth)) return;
+            const m = Number(rec.morning) || 0;
+            const e = Number(rec.evening) || 0;
+            entries.push({
+                date: rec.date || '',
+                row: [
+                    formatDateTR(rec.date),
+                    animal.kupeNo || '',
+                    animal.hayvanLakabi || '',
+                    animal.hayvanCinsi || '',
+                    formatLiters(m),
+                    formatLiters(e),
+                    formatLiters(m + e)
+                ]
+            });
+        });
+    });
+
+    if (!entries.length) {
+        Swal.fire({
+            title: 'Kayıt Bulunamadı',
+            text: selectedMonth ? `${selectedMonth} dönemine ait süt kaydı yok.` : 'Dışa aktarılacak süt kaydı bulunmuyor.',
+            icon: 'info',
+            confirmButtonText: 'Tamam'
+        });
+        return;
+    }
+
+    entries.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const suffix = selectedMonth || `Tumu_${getTodayDateString()}`;
+    downloadCsvFile(`Ciftlik_Sut_Kayitlari_${suffix}.csv`, headers, entries.map(item => item.row));
+    Swal.fire({ title: 'İndirildi!', text: `${entries.length} günlük süt kaydı CSV (Excel) olarak indirildi.`, icon: 'success', timer: 1600, showConfirmButton: false });
+};
+
+window.exportHealthCSV = function () {
+    const headers = ['Tarih', 'Küpe No', 'Lakap', 'Tür', 'İşlem / Aşı Adı', 'İlaç / Marka', 'Maliyet (TL)', 'Sıradaki Tarih', 'Notlar'];
+    const entries = [];
+
+    allData.forEach(animal => {
+        getHealthRecords(animal).forEach(rec => {
+            const meta = HEALTH_TYPE_META[rec.type] || HEALTH_TYPE_META.other;
+            entries.push({
+                date: rec.date || '',
+                row: [
+                    formatDateTR(rec.date),
+                    animal.kupeNo || '',
+                    animal.hayvanLakabi || '',
+                    meta.label.replace(/^[^\wÇĞİÖŞÜçğıöşü]+/, '').trim(),
+                    rec.title || '',
+                    rec.medicine || '',
+                    rec.cost ? formatLiters(rec.cost) : '',
+                    rec.nextDate ? formatDateTR(rec.nextDate) : '',
+                    rec.notes || ''
+                ]
+            });
+        });
+    });
+
+    if (!entries.length) {
+        Swal.fire({ title: 'Kayıt Bulunamadı', text: 'Dışa aktarılacak sağlık veya aşı kaydı bulunmuyor.', icon: 'info', confirmButtonText: 'Tamam' });
+        return;
+    }
+
+    entries.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    downloadCsvFile(`Ciftlik_Saglik_Raporu_${getTodayDateString()}.csv`, headers, entries.map(item => item.row));
+    Swal.fire({ title: 'İndirildi!', text: `${entries.length} sağlık kaydı CSV (Excel) olarak indirildi.`, icon: 'success', timer: 1600, showConfirmButton: false });
+};
 
 function aggregateHerdMilkSeries(days) {
     const dates = getRecentDateRange(days);
