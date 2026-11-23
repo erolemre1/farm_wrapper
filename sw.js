@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ciftlik-pro-v4';
+const CACHE_NAME = 'ciftlik-pro-v5';
 const APP_SHELL = [
   './',
   './index.html',

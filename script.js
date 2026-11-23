@@ -285,17 +285,75 @@ window.toggleMilkingFormField = function () {
     }
 };
 
+function findDuplicateKupeAnimal(kupeNo, excludeId = null) {
+    const normalized = normalizeKupeNo(kupeNo);
+    if (!normalized) return null;
+    return allData.find(row => row.id !== excludeId && normalizeKupeNo(row.kupeNo) === normalized) || null;
+}
+
+window.checkDuplicateKupeNo = function () {
+    const inputEl = document.getElementById('kupeNo');
+    const warnEl = document.getElementById('kupeNoWarning');
+    if (!inputEl || !warnEl) return null;
+
+    const editIdVal = document.getElementById('editId')?.value || '';
+    const excludeId = editIdVal ? Number(editIdVal) : null;
+    const duplicate = findDuplicateKupeAnimal(inputEl.value, excludeId);
+
+    if (duplicate) {
+        const isActive = !duplicate.herdStatus || duplicate.herdStatus === 'active';
+        const statusText = isActive ? 'Aktif sürüde' : 'Sürüden çıkmış kayıtta';
+        const nickPart = duplicate.hayvanLakabi ? ` (${duplicate.hayvanLakabi})` : '';
+        warnEl.innerText = `⚠️ Bu küpe numarası zaten kayıtlı: ${duplicate.kupeNo}${nickPart} — ${statusText}.`;
+        warnEl.style.display = 'block';
+        inputEl.classList.add('input-error');
+    } else {
+        warnEl.innerText = '';
+        warnEl.style.display = 'none';
+        inputEl.classList.remove('input-error');
+    }
+    return duplicate;
+};
+
 document.getElementById('animalForm').addEventListener('submit', (e) => {
     e.preventDefault();
+    const kupeNoVal = document.getElementById('kupeNo').value.trim();
+    const editId = document.getElementById('editId').value;
+    const returnTargetView = editId ? editReturnView : 'listView';
+    const editedAnimalId = editId ? Number(editId) : null;
+
+    const duplicateAnimal = findDuplicateKupeAnimal(kupeNoVal, editedAnimalId);
+    if (duplicateAnimal) {
+        checkDuplicateKupeNo();
+        const nickPart = duplicateAnimal.hayvanLakabi ? ` (${duplicateAnimal.hayvanLakabi})` : '';
+        Swal.fire({
+            title: 'Aynı Küpe Numarası Mevcut!',
+            text: `${kupeNoVal} küpe numarası zaten kayıtlı${nickPart}. Lütfen farklı bir küpe numarası girin veya mevcut kaydı açın.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Kayıtlı Hayvanı Aç',
+            cancelButtonText: 'Düzelt',
+            confirmButtonColor: '#0056b3'
+        }).then(result => {
+            if (result.isConfirmed) {
+                resetAnimalForm();
+                openAnimalDetail(duplicateAnimal.id, 'general');
+            } else {
+                document.getElementById('kupeNo')?.focus();
+            }
+        });
+        return;
+    }
+
     const cinsiyetVal = document.getElementById('cinsiyet').value;
     const isMilkingVal = cinsiyetVal === 'Dişi' ? document.getElementById('isMilking').checked : false;
     const data = {
-        kupeNo: document.getElementById('kupeNo').value,
-        hayvanLakabi: document.getElementById('hayvanLakabi').value,
+        kupeNo: kupeNoVal,
+        hayvanLakabi: document.getElementById('hayvanLakabi').value.trim(),
         cinsiyet: cinsiyetVal,
         hayvanCinsi: document.getElementById('hayvanCinsi').value,
         dogumTarihi: document.getElementById('dogumTarihi').value,
-        anneKupeNo: document.getElementById('anneKupeNo').value,
+        anneKupeNo: document.getElementById('anneKupeNo').value.trim(),
         anneCinsi: document.getElementById('anneCinsi').value,
         kogustuguTarih: document.getElementById('kogustuguTarih').value,
         hayvanResmi: base64Hayvan,
@@ -308,9 +366,6 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         notes: ''
     };
 
-    const editId = document.getElementById('editId').value;
-    const returnTargetView = editId ? editReturnView : 'listView';
-    const editedAnimalId = editId ? Number(editId) : null;
     if (editId) {
         data.id = editedAnimalId;
         const existingRecord = allData.find(row => row.id === data.id);
@@ -351,14 +406,10 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         });
     };
 
-
-    /// tireşim
-    
     if ("vibrate" in navigator) {
-    navigator.vibrate(500); 
-
-    } else {
-        alert("Bu cihaz veya tarayıcı titreşim özelliğini desteklemiyor.");
+        try {
+            navigator.vibrate(200);
+        } catch (_) {}
     }
 });
 
@@ -2833,6 +2884,7 @@ window.startEdit = function (rowOrId) {
 
     document.getElementById('editId').value = row.id;
     document.getElementById('kupeNo').value = row.kupeNo;
+    checkDuplicateKupeNo();
     document.getElementById('hayvanLakabi').value = row.hayvanLakabi || "";
     document.getElementById('cinsiyet').value = row.cinsiyet;
     document.getElementById('isMilking').checked = isAnimalMilking(row);
@@ -2877,6 +2929,7 @@ function resetAnimalForm() {
     document.getElementById('cancelEditBtn').innerText = "İptal Et ve Listeye Dön";
     document.getElementById('isMilking').checked = false;
     toggleMilkingFormField();
+    checkDuplicateKupeNo();
 
     document.getElementById('previewHayvan').style.display = 'none';
     document.getElementById('previewAnne').style.display = 'none';

@@ -2231,3 +2231,15 @@
 .detail-tab-panel.active {
     display: block;
 }
+
+.field-warning {
+    margin-top: 5px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #dc3545;
+}
+
+input.input-error {
+    border-color: #dc3545;
+    background-color: #fff5f5;
+}
