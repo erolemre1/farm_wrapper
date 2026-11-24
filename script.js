@@ -335,6 +335,65 @@ handleImageUpload('anneResmiCamera', true);
 let activeCameraStream = null;
 let activeCameraTarget = 'hayvan';
 let activeCameraFacingMode = 'environment';
+let isCameraTorchOn = false;
+
+function updateCameraTorchUI() {
+    const btn = document.getElementById('cameraTorchBtn');
+    if (!btn) return;
+    btn.classList.toggle('torch-on', isCameraTorchOn);
+    btn.setAttribute('aria-pressed', isCameraTorchOn ? 'true' : 'false');
+    btn.title = isCameraTorchOn ? 'Flaşı Kapat' : 'Flaşı Aç';
+}
+
+window.toggleCameraTorch = async function () {
+    if (!activeCameraStream) return;
+    const videoTrack = activeCameraStream.getVideoTracks()[0];
+    if (!videoTrack || typeof videoTrack.applyConstraints !== 'function') {
+        Swal.fire({
+            title: 'Flaş Desteklenmiyor',
+            text: 'Bu cihaz veya tarayıcı kamera flaş kontrolünü desteklemiyor.',
+            icon: 'info',
+            timer: 1800,
+            showConfirmButton: false
+        });
+        return;
+    }
+
+    const capabilities = typeof videoTrack.getCapabilities === 'function' ? videoTrack.getCapabilities() : null;
+    if (capabilities && capabilities.torch === false) {
+        Swal.fire({
+            title: 'Flaş Desteklenmiyor',
+            text: 'Seçili kamera flaş (el feneri) özelliğini desteklemiyor. Arka kamerayı deneyin.',
+            icon: 'info',
+            timer: 2000,
+            showConfirmButton: false
+        });
+        return;
+    }
+
+    const nextState = !isCameraTorchOn;
+    try {
+        await videoTrack.applyConstraints({ advanced: [{ torch: nextState }] });
+        isCameraTorchOn = nextState;
+        updateCameraTorchUI();
+    } catch (err) {
+        try {
+            await videoTrack.applyConstraints({ torch: nextState });
+            isCameraTorchOn = nextState;
+            updateCameraTorchUI();
+        } catch (_) {
+            isCameraTorchOn = false;
+            updateCameraTorchUI();
+            Swal.fire({
+                title: 'Flaş Açılamadı',
+                text: 'Bu kamera veya tarayıcı flaş ışığını açmayı desteklemiyor.',
+                icon: 'info',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+    }
+};
 
 window.openImageFilePicker = function (type) {
     const inputId = type === 'anne' ? 'anneResmi' : 'hayvanResmi';
@@ -342,6 +401,9 @@ window.openImageFilePicker = function (type) {
 };
 
 async function startLiveCameraStream(facingMode) {
+    isCameraTorchOn = false;
+    updateCameraTorchUI();
+
     if (activeCameraStream) {
         activeCameraStream.getTracks().forEach(track => track.stop());
         activeCameraStream = null;
@@ -456,9 +518,15 @@ window.captureCameraPhoto = function () {
 
 window.closeCameraCaptureModal = function () {
     if (activeCameraStream) {
+        const videoTrack = activeCameraStream.getVideoTracks()[0];
+        if (isCameraTorchOn && videoTrack && typeof videoTrack.applyConstraints === 'function') {
+            videoTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+        }
         activeCameraStream.getTracks().forEach(track => track.stop());
         activeCameraStream = null;
     }
+    isCameraTorchOn = false;
+    updateCameraTorchUI();
     const videoEl = document.getElementById('cameraVideoPreview');
     if (videoEl) videoEl.srcObject = null;
     const modal = document.getElementById('cameraCaptureModal');

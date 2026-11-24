@@ -360,7 +360,10 @@
         <div class="modal-content camera-capture-card">
             <div class="camera-modal-header">
                 <h3 id="cameraModalTitle">📷 Fotoğraf Çek</h3>
-                <button type="button" class="camera-close-btn" onclick="closeCameraCaptureModal()">&times;</button>
+                <div class="camera-header-controls">
+                    <button type="button" id="cameraTorchBtn" class="camera-torch-btn" onclick="toggleCameraTorch()" title="Flaşı Aç / Kapat" aria-label="Flaş">⚡</button>
+                    <button type="button" class="camera-close-btn" onclick="closeCameraCaptureModal()">&times;</button>
+                </div>
             </div>
             <video id="cameraVideoPreview" autoplay playsinline muted></video>
             <div class="camera-modal-actions">
