@@ -4655,44 +4655,81 @@ window.toggleReceiveQR = function () {
     });
 
     peer.on('connection', function (conn) {
-        let incomingData = [];
+        let incomingAnimals = [];
+        let incomingFinance = [];
+        let incomingSettings = [];
         let expectedTotal = 0;
+        let expectedFinance = 0;
+        let hasV2Payload = false;
+
         conn.on('data', function (msg) {
             if (msg.type === 'START') {
-                incomingData = [];
-                expectedTotal = msg.total;
+                incomingAnimals = [];
+                incomingFinance = [];
+                incomingSettings = Array.isArray(msg.settings) ? msg.settings : [];
+                expectedTotal = msg.total || 0;
+                expectedFinance = msg.financeTotal || 0;
+                hasV2Payload = msg.financeTotal !== undefined || Array.isArray(msg.settings);
                 showLoading(`Bağlantı kuruldu. 0 / ${expectedTotal} hayvan indiriliyor...`);
                 conn.send({ type: 'READY' });
             }
             else if (msg.type === 'CHUNK') {
-                incomingData.push(msg.data);
-                showLoading(`İndiriliyor: ${incomingData.length} / ${expectedTotal} hayvan tamamlandı...`);
+                incomingAnimals.push(msg.data);
+                showLoading(`İndiriliyor: ${incomingAnimals.length} / ${expectedTotal} hayvan tamamlandı...`);
+                conn.send({ type: 'ACK' });
+            }
+            else if (msg.type === 'FINANCE_CHUNK') {
+                const items = Array.isArray(msg.data) ? msg.data : [msg.data];
+                incomingFinance.push(...items);
+                showLoading(`Gelir-gider kayıtları indiriliyor: ${incomingFinance.length} / ${expectedFinance}...`);
                 conn.send({ type: 'ACK' });
             }
             else if (msg.type === 'END') {
                 hideLoading();
+                const summaryDetail = hasV2Payload
+                    ? `${incomingAnimals.length} hayvan kaydı, ${incomingFinance.length} gelir-gider kaydı ve çiftlik ayarları`
+                    : `${incomingAnimals.length} hayvan kaydı`;
+
                 Swal.fire({
                     title: 'Veri Aktarımı Tamamlandı',
-                    text: `Karşı cihazdan ${incomingData.length} hayvan kaydı başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?`,
+                    text: `Karşı cihazdan ${summaryDetail} başarıyla indirildi! Mevcut veriler silinip yenileri eklenecek. Onaylıyor musunuz?`,
                     icon: 'question', showCancelButton: true, confirmButtonText: 'Evet, Yükle', cancelButtonText: 'İptal', confirmButtonColor: '#28a745'
                 }).then((result) => {
                     if (result.isConfirmed) {
                         showLoading("Veriler veritabanına işleniyor...");
                         setTimeout(() => {
-                            const tx = db.transaction("kayitlar", "readwrite");
-                            const store = tx.objectStore("kayitlar");
-                            store.clear();
-                            incomingData.forEach(item => store.put(item));
+                            const storeNames = ["kayitlar"];
+                            if (hasV2Payload && db.objectStoreNames.contains("finans")) storeNames.push("finans");
+                            if (hasV2Payload && db.objectStoreNames.contains("ayarlar")) storeNames.push("ayarlar");
+
+                            const tx = db.transaction(storeNames, "readwrite");
+                            const animalStore = tx.objectStore("kayitlar");
+                            animalStore.clear();
+                            incomingAnimals.forEach(item => animalStore.put(item));
+
+                            if (storeNames.includes("finans")) {
+                                const finStore = tx.objectStore("finans");
+                                finStore.clear();
+                                incomingFinance.forEach(item => finStore.put(item));
+                            }
+                            if (storeNames.includes("ayarlar")) {
+                                const setStore = tx.objectStore("ayarlar");
+                                setStore.clear();
+                                incomingSettings.forEach(item => {
+                                    if (item && item.key) setStore.put(item);
+                                });
+                            }
+
                             tx.oncomplete = () => {
                                 hideLoading();
-                                Swal.fire({ title: 'Başarılı!', text: 'Veriler başarıyla aktarıldı!', icon: 'success', confirmButtonText: 'Tamam' });
+                                Swal.fire({ title: 'Başarılı!', text: 'Tüm veriler başarıyla aktarıldı!', icon: 'success', confirmButtonText: 'Tamam' });
                                 loadData(); resetPeerState();
                             };
                             tx.onerror = () => {
                                 hideLoading();
                                 Swal.fire({ title: 'Hata!', text: 'Veritabanına yazılırken bir hata oluştu!', icon: 'error', confirmButtonText: 'Tamam' });
                                 resetPeerState();
-                            }
+                            };
                         }, 100);
                     } else { resetPeerState(); }
                 });
@@ -4741,27 +4778,67 @@ function sendDataToPeer(targetPeerId) {
     const connectAndSend = () => {
         showLoading("Alıcı cihaza bağlanılıyor...");
         setTimeout(() => {
-            const tx = db.transaction("kayitlar", "readonly");
-            const request = tx.objectStore("kayitlar").getAll();
-            request.onsuccess = () => {
-                const allData = request.result;
+            const storeNames = ["kayitlar"];
+            if (db.objectStoreNames.contains("finans")) storeNames.push("finans");
+            if (db.objectStoreNames.contains("ayarlar")) storeNames.push("ayarlar");
+
+            const tx = db.transaction(storeNames, "readonly");
+            let animalsToSend = [];
+            let financeToSend = [];
+            let settingsToSend = [];
+
+            const animalsReq = tx.objectStore("kayitlar").getAll();
+            animalsReq.onsuccess = () => { animalsToSend = animalsReq.result || []; };
+
+            if (storeNames.includes("finans")) {
+                const finReq = tx.objectStore("finans").getAll();
+                finReq.onsuccess = () => { financeToSend = finReq.result || []; };
+            }
+            if (storeNames.includes("ayarlar")) {
+                const setReq = tx.objectStore("ayarlar").getAll();
+                setReq.onsuccess = () => { settingsToSend = setReq.result || []; };
+            }
+
+            tx.oncomplete = () => {
                 const conn = peer.connect(targetPeerId);
-                let currentIndex = 0; 
-                conn.on('open', function () { conn.send({ type: 'START', total: allData.length }); });
+                let animalIndex = 0;
+                let financeIndex = 0;
+                const FINANCE_BATCH_SIZE = 50;
+
+                conn.on('open', function () {
+                    conn.send({
+                        type: 'START',
+                        total: animalsToSend.length,
+                        financeTotal: financeToSend.length,
+                        settings: settingsToSend
+                    });
+                });
+
                 conn.on('data', function (msg) {
                     if (msg.type === 'READY' || msg.type === 'ACK') {
-                        if (currentIndex < allData.length) {
-                            showLoading(`Gönderiliyor: ${currentIndex + 1} / ${allData.length} hayvan...`);
-                            conn.send({ type: 'CHUNK', data: allData[currentIndex] });
-                            currentIndex++; 
+                        if (animalIndex < animalsToSend.length) {
+                            showLoading(`Gönderiliyor: ${animalIndex + 1} / ${animalsToSend.length} hayvan...`);
+                            conn.send({ type: 'CHUNK', data: animalsToSend[animalIndex] });
+                            animalIndex++;
+                        } else if (financeIndex < financeToSend.length) {
+                            const batch = financeToSend.slice(financeIndex, financeIndex + FINANCE_BATCH_SIZE);
+                            financeIndex += batch.length;
+                            showLoading(`Gelir-gider gönderiliyor: ${financeIndex} / ${financeToSend.length}...`);
+                            conn.send({ type: 'FINANCE_CHUNK', data: batch });
                         } else {
                             conn.send({ type: 'END' });
                             hideLoading();
-                            Swal.fire({ title: 'Başarılı!', text: 'Tüm veriler karşı cihaza başarıyla gönderildi.', icon: 'success', confirmButtonText: 'Tamam' });
+                            Swal.fire({
+                                title: 'Başarılı!',
+                                text: `${animalsToSend.length} hayvan, ${financeToSend.length} gelir-gider kaydı ve ayarlar karşı cihaza başarıyla gönderildi.`,
+                                icon: 'success',
+                                confirmButtonText: 'Tamam'
+                            });
                             setTimeout(() => resetPeerState(), 500);
                         }
                     }
                 });
+
                 conn.on('error', function (err) {
                     hideLoading();
                     Swal.fire({ title: 'Hata!', text: 'Gönderim hatası: Bağlantı kurulamadı.', icon: 'error', confirmButtonText: 'Tamam' });
